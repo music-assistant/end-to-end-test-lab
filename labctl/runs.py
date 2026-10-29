@@ -29,6 +29,8 @@ POTOKEN_SERVICE = "potoken"
 RADIO_SERVICE = "radio"
 RADIO_PORT = 8000
 STOP_TIMEOUT_S = 10
+# watchdog over the whole tests container; a deep run takes about 45 min
+TESTS_TIMEOUT_S = 2 * 3600
 CLIAIRPLAY_DIR = "music_assistant/providers/airplay/bin"
 # every non-Sendspin player writes 48 kHz 16-bit stereo into this FIFO; its pacer reads it
 FIFO = "/fifo/pcm"
@@ -42,7 +44,7 @@ TESTS_DATA_DIR = "/data"
 # where the tests container sees the run's copy of the lab repo
 TESTS_SRC_DIR = "/src"
 DOCKER_SOCKET = "/var/run/docker.sock"
-# tier 1: the tone library and the run's writable music folder, both below the server's /music
+# without an account set: the tone library and the run's writable music folder, below /music
 MUSIC_PATH = "/music"
 TONES_MOUNT = f"{MUSIC_PATH}/tones"
 EXTRA_MOUNT = f"{MUSIC_PATH}/extra"
@@ -84,7 +86,7 @@ class Run:
     id: str
     dir: Path
     roles: tuple[str, ...]
-    # tier 2: the account set's golden data dir, mounted in place instead of a fresh one
+    # the account set's golden data dir, mounted in place instead of a fresh one
     account_data: Path | None = None
     # gate areas the run was started with, empty outside a gate run
     areas: tuple[str, ...] = ()
@@ -100,14 +102,9 @@ class Run:
         return bool(self.devices)
 
     @property
-    def tier(self) -> int:
-        """Scenario tier: 2 against an account set, else 1."""
-        return 1 if self.account_data is None else 2
-
-    @property
     def identity_scope(self) -> str:
-        """Seed of the players' identities: the account set in tier 2, else the run id."""
-        # a tier 2 run writes into the golden, which then keeps one player config per role
+        """Seed of the players' identities: the account set in a music run, else the run id."""
+        # a music run writes into the golden, which then keeps one player config per role
         return self.id if self.account_data is None else self.account_data.parent.name
 
     @property
@@ -127,7 +124,7 @@ class Run:
 
     @property
     def music_extra_dir(self) -> Path:
-        """Tier 1 music folder scenarios add files to, at /music/extra in the server."""
+        """Music folder scenarios add files to, at /music/extra in the server."""
         return self.dir / "music-extra"
 
     @property
@@ -339,7 +336,7 @@ def render_compose(
         tests["environment"]["LAB_COMPOSE_PROJECT"] = run.project
     else:
         # the Soloist engine's WebSocket listens on the server's loopback and publishes its
-        # port in the data dir, so tier 2 scenarios share the server's network namespace
+        # port in the data dir, so music scenarios share the server's network namespace
         tests["network_mode"] = "service:ma"
         tests["environment"]["LAB_ACCOUNT_SET"] = run.account_data.parent.name
     services["tests"] = tests
@@ -430,9 +427,15 @@ def is_up(run: Run) -> bool:
 
 
 def run_tests(run: Run) -> int:
-    """Run the tests container in the foreground and return pytest's exit code."""
+    """Run the tests container in the foreground and return pytest's exit code, 124 on timeout."""
     cmd = ["docker", "compose", "-p", run.project, "-f", str(run.compose_file)]
-    return subprocess.run([*cmd, "run", "--rm", "-T", "tests"], check=False).returncode
+    try:
+        return subprocess.run(
+            [*cmd, "run", "--rm", "-T", "tests"], check=False, timeout=TESTS_TIMEOUT_S
+        ).returncode
+    except subprocess.TimeoutExpired:
+        print(f"run {run.id}: tests still running after {TESTS_TIMEOUT_S} s, killed")
+        return 124
 
 
 def teardown(run: Run) -> None:

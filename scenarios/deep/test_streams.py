@@ -24,6 +24,7 @@ pytestmark = [
     pytest.mark.deep,
     pytest.mark.area_streams,
     pytest.mark.roles(*AREA_ROLES["streams"]),
+    pytest.mark.timeout(300),
 ]
 
 

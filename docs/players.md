@@ -133,22 +133,22 @@ Did not work as well:
 
 # Bench devices
 
-Real speakers on the bench, leased per run. The hw journeys in `scenarios/hw/test_bench.py` run
-only with `lab run --providers <id>,<id>` or `--providers devices`: the registry is `[devices]` in
-`config/lab.toml`, `lab hw init` sets the devices up, and the run leases them and adds a macvlan
+Real speakers on the bench, leased per run. The bench journeys in `scenarios/bench/test_bench.py`
+run only with `lab run --providers <id>,<id>` or `--providers devices`: the registry is `[devices]`
+in `config/lab.toml`, `lab hw init` sets the devices up, and the run leases them and adds a macvlan
 network so MA reaches them on the LAN. Entry format and the network setup are in the runbook's
-[Hardware](runbook.md#hardware) section. The journey runs once per leased device; with none
-leased it is skipped.
+[Hardware](runbook.md#hardware) section. The journey runs once per leased device; with none leased
+it is skipped.
 
 The table below is the reference bench this lab was built with. Any registered device works; the
 registry decides what runs.
 
 Measured on the bench 2026-10-28 (dev at `8192482d`, run `20261028-095230-0310`), all five devices
-in one run with `--providers devices`, the nightly shape: smoke, bench journeys and state
-checks, wall clock 1110 s. Play to `playing` and stop to `idle` from the smoke, the journey from
-`test_bench.py`, the state checks from `test_state.py` (long pause is about 70 s on every device,
-the rest 2 to 14 s each; the Sonos group 3 s; the restart 19.5 s with every device back 11 to 16 s
-after the restart command):
+in one run with `--providers devices`, the nightly shape: play and stop, bench journeys and state
+checks, wall clock 1110 s. Play to `playing` and stop to `idle` from `test_play_stop.py`, the
+journey from `test_bench.py`, the state checks from `test_state.py` (long pause is about 70 s on
+every device, the rest 2 to 14 s each; the Sonos group 3 s; the restart 19.5 s with every device
+back 11 to 16 s after the restart command):
 
 | Device | play -> playing | stop -> idle | journey | state checks |
 |---|---|---|---|---|
@@ -184,24 +184,23 @@ What each check asserts:
 - `bench_seek`: a seek to 40 s in `a1t4` reports 39 to 48 s within 8 s, and the track ends 12 to
   35 s after the seek (no restart from 0, no early end).
 - `bench_stop_position`: `a3t1` played to its end never reports an elapsed time or resume
-  position past its length, and a replay reports under 5 s elapsed 2 s after it plays.
+  position over 1 s past its length, and a replay reports under 5 s elapsed 2 s after it plays.
 - `bench_next_skips_one`: next 3 s into the album reaches index 1 and not index 2 within 5 s.
 - `bench_group_skip`: with the second device grouped, next reaches index 1, both players report
   playing and the member stays synced to the leader.
 
-`scenarios/hw/test_state.py` runs the state checks below, one test per check, on every leased
-device; the group check only on Sonos and the restart check once. They carry the same `hw` and
-`tier1` markers, so they run in the nightly routine's device run and in per-PR device runs.
+`scenarios/bench/test_state.py` runs the state checks below, one test per check, on every leased
+device; the group check only on Sonos and the restart check once. They carry the same `bench`
+marker, so they run in the nightly routine's device run and in per-PR device runs.
 Devices bootstrap at volume 1 and the volume checks stay at 3 or below, then set 1 again.
 
 - `bench_volume_reported`: with `a1t4` playing, volume 3 is reported within 10 s, then volume 1.
-  A device without `VOLUME_SET` records `volume_checked: False` and is not checked.
+  A device without `VOLUME_SET` skips the test (`<device> has no VOLUME_SET`).
 - `bench_mute`: with `a1t4` playing at volume 3, mute is reported within 10 s and unmute reports
-  unmuted at volume 3. A device without `VOLUME_SET` and `VOLUME_MUTE` records
-  `mute_checked: False`.
+  unmuted at volume 3. A device without `VOLUME_SET` or `VOLUME_MUTE` skips the test.
 - `bench_volume_kept`: volume 3 is still reported 1 s after the album reports playing and 1 s
   after each of pause, resume and next, recorded as `volume_after_<command>`. Same
-  `volume_checked` rule.
+  `VOLUME_SET` skip.
 - `bench_long_pause`: `a1t4` paused after 5 s leaves `playing`; the queue is `idle` within 40 s
   (`idle_after_s`: at once for a stop-style pause, the player queue controller's 30 s limit for a
   held one), still `idle` 60 s after the pause, and resume plays on from the paused position
@@ -213,11 +212,11 @@ Devices bootstrap at volume 1 and the volume checks stay at 3 or below, then set
 - `bench_group_state` (`test_sonos_group`, the first leased Sonos as leader, skipped with one): both Sonos report playing within 15 s of
   `a1t4` starting, next reaches index 1 with both playing and the member still synced, and
   ungroup leaves the member idle and unsynced while the leader plays on.
-- `bench_restart_rediscovers` (`test_restart_rediscovers`, once per run, tier 1 docker access
-  only): after a server restart every leased device is available within 90 s of the server
+- `bench_restart_rediscovers` (`test_restart_rediscovers`, once per run, needs the docker socket of
+  the run): after a server restart every leased device is available within 90 s of the server
   answering again, recorded per device as `rediscovered_s_<id>` counted from the restart command,
   and the first device plays `a1t4`.
 
-To add a family: add a test with `@pytest.mark.devices("<provider>")` (the registry provider key)
-to `scenarios/hw/test_bench.py` that takes `device` and `ctx` and passes the `bench_*` checks that
+To add a family: add a test with `@pytest.mark.devices("<provider>")` (the registry provider key) to
+`scenarios/bench/test_bench.py` that takes `device` and `ctx` and passes the `bench_*` checks that
 fit the device to `_journey`.

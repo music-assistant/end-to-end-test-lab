@@ -22,7 +22,12 @@ from scenarios.checks.players import (
 )
 
 # the area boots slim-1 and slim-2; the journey runs once on slim-1 with slim-2 as its partner
-pytestmark = [pytest.mark.gate, pytest.mark.area_players, pytest.mark.roles("slim-1")]
+pytestmark = [
+    pytest.mark.gate,
+    pytest.mark.area_players,
+    pytest.mark.roles("slim-1"),
+    pytest.mark.timeout(600),
+]
 
 
 async def test_players(role: str, ctx: CheckContext) -> None:

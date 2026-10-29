@@ -1,4 +1,4 @@
-"""Helpers shared by tier 2 scenarios: track selection, queue events, server log, Soloist engine."""
+"""Helpers shared by music scenarios: track selection, queue events, server log, Soloist engine."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import pytest
+from music_assistant_models.enums import MediaType, SortField
 
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
     from labctl.analyze import Segment
 
-# the account golden, mounted read-only into the tests container of a tier 2 run
+# the account golden, mounted read-only into the tests container of a music run
 DATA_DIR = Path("/data")
 MA_LOG = DATA_DIR / "musicassistant.log"
 # the level field after the timestamp of a server log line
@@ -36,8 +37,6 @@ ENGINE_COMMAND_TIMEOUT_S = 5.0
 
 async def pick_tracks(client: MusicAssistantClient, count: int) -> list[Track]:
     """Return `count` available tracks of 1 to 4 minutes, library first (by name), else search."""
-    from music_assistant_models.enums import MediaType, SortField
-
     library = await client.music.get_library_tracks(limit=LIBRARY_LIMIT, sort_field=SortField.NAME)
     picked = _fitting(library, count)
     if len(picked) < count:

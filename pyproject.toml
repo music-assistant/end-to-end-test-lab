@@ -13,8 +13,8 @@ dependencies = [
 
 [project.optional-dependencies]
 players = ["aiosendspin>=10.2"]
-test = ["pytest>=8.0", "pytest-asyncio>=0.24"]
-scenarios = ["music-assistant-client"]
+test = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-timeout>=2.3"]
+scenarios = ["music-assistant-client>=1.7,<2"]
 
 [project.scripts]
 labctl = "labctl.cli:main"
@@ -35,11 +35,14 @@ include = ["labctl*"]
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+timeout = 900
+# "thread" kills the process: no junit.xml and no `finally` teardown in the test
+timeout_method = "signal"
 addopts = "--strict-markers"
 markers = [
-    "tier1: deterministic scenario on virtual players, may gate a PR",
-    "tier2: scenario against real streaming accounts, informational only",
-    "hw: scenario that needs leased real hardware",
+    "smoke: play and stop on every virtual player",
+    "music: scenario against a real streaming account",
+    "bench: scenario that needs leased real devices",
     "gate: per-area journey a PR gate runs",
     "deep: one check per test, daily deep run",
     "area_core: gate area core",
@@ -53,12 +56,12 @@ markers = [
     "provider_squeezelite: gate journey of the squeezelite player provider",
     "provider_snapcast: gate journey of the snapcast player provider",
     "provider_mpd: gate journey of the mpd player provider",
-    "area_music_spotify: tier 2 area spotify",
-    "area_music_apple_music: tier 2 area apple_music",
-    "area_music_tidal: tier 2 area tidal",
-    "area_music_ytmusic: tier 2 area ytmusic",
-    "area_music_qobuz: tier 2 area qobuz",
-    "area_music_deezer: tier 2 area deezer",
+    "area_music_spotify: music area spotify",
+    "area_music_apple_music: music area apple_music",
+    "area_music_tidal: music area tidal",
+    "area_music_ytmusic: music area ytmusic",
+    "area_music_qobuz: music area qobuz",
+    "area_music_deezer: music area deezer",
     "roles(*roles): player roles the test runs on",
     "devices(*providers): device families (registry provider keys) the test runs on",
 ]

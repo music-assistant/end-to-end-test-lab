@@ -1,8 +1,8 @@
-"""Tier 2 account sets: a login instance per set, frozen into a golden data dir.
+"""Account sets for music runs: a login instance per set, frozen into a golden data dir.
 
 `accounts/<set>/` on the VM holds:
 
-- `data/`: the golden data dir, mounted in place at /data by tier 2 runs
+- `data/`: the golden data dir, mounted in place at /data by music runs
 - `password`: password of the `lab` admin, for logging in to the login instance's UI
 - `token`: long-lived API token of the `lab` admin, written by freeze
 - `compose.yml` and `run.json` (sha, ref, url): the login instance of `init` or `reopen`,

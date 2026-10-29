@@ -7,7 +7,12 @@ import pytest
 from scenarios.checks.context import CheckContext
 from scenarios.checks.library import rows_survive_restart, scan_matches_manifest
 
-pytestmark = [pytest.mark.deep, pytest.mark.area_library, pytest.mark.roles("slim-1")]
+pytestmark = [
+    pytest.mark.deep,
+    pytest.mark.area_library,
+    pytest.mark.roles("slim-1"),
+    pytest.mark.timeout(300),
+]
 
 
 async def test_scan_matches_manifest(role: str, ctx: CheckContext) -> None:

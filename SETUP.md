@@ -33,7 +33,7 @@ Everything else runs on the VM. Python 3.12 or newer is only needed to run the l
 `tests/`, not to use the lab:
 
 ```
-pip install -e '.[test]'
+pip install -e '.[test,scenarios]'
 python -m pytest tests
 ```
 
@@ -45,7 +45,7 @@ python -m pytest tests
    or a free address for the VM. mDNS and SSDP must not be bridged or reflected between this
    segment and your home LAN.
 2. **Internet access** from the segment (NAT through your router). The VM pulls images and git
-   refs, and tier 2 runs talk to the streaming services.
+   refs, and music runs talk to the streaming services.
 3. **A firewall rule** on the router: drop *new* connections from the lab segment to the home LAN,
    allow everything else. Established and related traffic must pass, so that connections your
    Mac or browser opens into the lab get their replies. The lab must not be able to open
@@ -261,12 +261,12 @@ built by every run. The tone library is 8 FLAC tracks, regenerated only when the
 bin/lab run --ref dev                                  # smoke on every player kind, about 2 min cold
 ```
 
-It must exit 0. It also clones the mirror and builds the tier 1 golden data dir (a throwaway
+It must exit 0. It also clones the mirror and builds the golden of the fresh data dir (a throwaway
 boot that creates the `lab` admin and mints a token into `/srv/lab/golden/tier1/`).
 
-## 9. Account sets (tier 2)
+## 9. Account sets (music runs)
 
-Tier 2 runs need the Music Assistant app vars file (the bundled client ids and keys for Spotify,
+Music runs need the Music Assistant app vars file (the bundled client ids and keys for Spotify,
 Apple Music, Tidal and Qobuz; core maintainers have the private `appvars` repo, everyone else
 needs their own developer credentials in the same `{name: value}` JSON form) and one frozen
 account set per streaming service you want to test.
@@ -335,12 +335,12 @@ bin/lab hw status
 bin/lab run --ref dev --providers devices
 ```
 
-Device runs need the VM's NIC on the lab segment (macvlan), so this tier is not available in the
+Device runs need the VM's NIC on the lab segment (macvlan), so the bench is not available in the
 laptop variant. The runbook's [Hardware](docs/runbook.md#hardware) section has the details.
 
 ## 11. Laptop variant (virtual players only)
 
-The whole lab can run in a Linux VM on your own machine, for the virtual tier only. Every image
+The whole lab can run in a Linux VM on your own machine, with virtual players only. Every image
 the lab uses is multi-arch (amd64 and arm64): the MA server images, `mikebrady/shairport-sync`,
 `brainicism/bgutil-ytdlp-pot-provider` and `debian:trixie-slim`. The cliairplay release has an
 aarch64 binary, and labctl picks the binary by host architecture.
@@ -392,7 +392,7 @@ machine, so the URL `bin/lab accounts init` prints opens as is. Untested.
 /srv/lab/server.git      bare mirror of music-assistant/server
 /srv/lab/refs/<sha>/     one worktree per checked out sha (refs/.lock serializes creation)
 /srv/lab/runs/<id>/      one directory per run: data/, captures/, src/, compose.yml, run.json, ma.log, junit.xml, summary.json
-/srv/lab/golden/tier1/   seed settings.json, auth.db and token for tier 1 runs
+/srv/lab/golden/tier1/   seed settings.json, auth.db and token for runs without an account set
 /srv/lab/accounts/<set>/ golden data dir, password, token, compose.yml of the login instance
 /srv/lab/music/tones/    generated tone library, mounted read-only at /music
 /srv/lab/cache/          uv cache (the only part mounted into servers) and cliairplay binaries

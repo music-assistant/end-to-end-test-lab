@@ -10,7 +10,12 @@ from scenarios.checks.context import CheckContext
 from scenarios.checks.library import rows_survive_restart, scan_matches_manifest
 
 # the restart runs last: it leaves the test's own client disconnected
-pytestmark = [pytest.mark.gate, pytest.mark.area_library, pytest.mark.roles("slim-1")]
+pytestmark = [
+    pytest.mark.gate,
+    pytest.mark.area_library,
+    pytest.mark.roles("slim-1"),
+    pytest.mark.timeout(600),
+]
 
 
 async def test_library(role: str, ctx: CheckContext) -> None:

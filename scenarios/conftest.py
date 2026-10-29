@@ -6,12 +6,13 @@ import asyncio
 import contextlib
 import os
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Generator, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_client import MusicAssistantClient
 
 from labctl.analyze import Capture, Manifest
 from labctl.areas import account_set_area
@@ -19,13 +20,15 @@ from labctl.devices import Device, from_env, matches
 from scenarios.checks.context import CaptureLoader, CheckContext
 
 if TYPE_CHECKING:
-    # the client library only exists in the tests container
-    from music_assistant_client import MusicAssistantClient
     from music_assistant_models.enums import EventType
     from music_assistant_models.event import MassEvent
 
 CONNECT_TIMEOUT_S = 30.0
 PLAYERS_TIMEOUT_S = 60.0
+FAILURE_EVENTS = 20
+# fields of a player or queue update that show what it changed to
+EVENT_FIELDS = ("state", "playback_state", "current_index", "elapsed_time", "volume_level")
+EVENT_DATA_CHARS = 80
 
 
 @dataclass(frozen=True)
@@ -63,6 +66,10 @@ class EventRecorder:
         self.events.append(RecordedEvent(time.time(), event))
         self._changed.set()
 
+    def tail(self, count: int) -> list[RecordedEvent]:
+        """Return the last `count` recorded events, oldest first."""
+        return self.events[-count:]
+
     async def wait_for(
         self,
         event_type: EventType,
@@ -96,6 +103,24 @@ class EventRecorder:
             raise AssertionError(
                 f"no {event_type.value} event matching {matching} within {timeout:.0f} s"
             ) from None
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(
+    item: pytest.Item,
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
+    """Append the test's last server events to the failure of its call phase."""
+    report = yield
+    longrepr = report.longrepr
+    events = item.funcargs.get("events") if isinstance(item, pytest.Function) else None
+    # a section of the exception repr lands in the junit failure text, not only the terminal
+    if report.when == "call" and report.failed and isinstance(events, EventRecorder):
+        # longrepr is typed as a union; only the exception repr of a failure has sections
+        if not hasattr(longrepr, "addsection"):
+            return report
+        lines = (_describe_event(recorded) for recorded in events.tail(FAILURE_EVENTS))
+        longrepr.addsection("events", "\n".join(lines))
+    return report
 
 
 def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
@@ -154,9 +179,7 @@ async def players(
 
     Other roles and devices are included only if their player is available at that moment.
     """
-    callspec = getattr(request.node, "callspec", None)
-    params = callspec.params if callspec is not None else {}
-    subject: str = params["role"] if "role" in params else params["device"]
+    subject = _subject(request)
     deadline = time.monotonic() + PLAYERS_TIMEOUT_S
     while True:
         available = [player for player in client.players if player.available]
@@ -190,16 +213,22 @@ def capture(run: LabRun, tones: Manifest) -> CaptureLoader:
 
 
 @pytest.fixture
-def ctx(
+async def ctx(
     client: MusicAssistantClient,
     players: dict[str, str],
     tones: Manifest,
     capture: CaptureLoader,
     events: EventRecorder,
     record_property: Callable[[str, object], None],
-) -> CheckContext:
-    """Bundle this test's fixtures for the shared checks."""
-    return CheckContext(client, players, tones, capture, events, record_property)
+    request: pytest.FixtureRequest,
+) -> AsyncIterator[CheckContext]:
+    """Bundle this test's fixtures for the shared checks; stop the test's player at teardown."""
+    yield CheckContext(client, players, tones, capture, events, record_property)
+    # a test killed by its time budget runs its own `finally` only after this client has closed
+    subject = _subject(request)
+    if subject in players:
+        with contextlib.suppress(Exception):
+            await client.player_queues.stop(players[subject])
 
 
 @pytest.fixture(autouse=True)
@@ -208,7 +237,7 @@ def record_area(
 ) -> None:
     """Record the area of every `area_<name>` and `provider_<domain>` marker.
 
-    A `provider_<domain>` marker records the domain; a tier 2 test records its account set area.
+    A `provider_<domain>` marker records the domain; a music test records its account set area.
     """
     areas = [
         marker.name.removeprefix("area_").removeprefix("provider_")
@@ -219,6 +248,14 @@ def record_area(
         areas = [account_set_area(account_set)]
     for area in areas:
         record_property("area", area)
+
+
+@pytest.fixture(autouse=True)
+def record_times(record_property: Callable[[str, object], None]) -> Iterator[None]:
+    """Record the wall-clock start and end of every test as `started_at` and `ended_at`."""
+    record_property("started_at", round(time.time(), 3))
+    yield
+    record_property("ended_at", round(time.time(), 3))
 
 
 def lab_run() -> LabRun:
@@ -237,8 +274,6 @@ def lab_run() -> LabRun:
 @contextlib.asynccontextmanager
 async def connect(run: LabRun, events: EventRecorder) -> AsyncIterator[MusicAssistantClient]:
     """Connect a listening client that records into `events`, with the server state loaded."""
-    from music_assistant_client import MusicAssistantClient
-
     ma = MusicAssistantClient(run.ma_url, None, token=run.token)
     ma.subscribe(events.record)
     ready = asyncio.Event()
@@ -259,6 +294,16 @@ async def connect(run: LabRun, events: EventRecorder) -> AsyncIterator[MusicAssi
             await listener
 
 
+def _describe_event(recorded: RecordedEvent) -> str:
+    """One line per event: time, type, object id and the fields it changed to."""
+    event = recorded.event
+    if isinstance(event.data, dict):
+        data = " ".join(f"{k}={event.data[k]}" for k in EVENT_FIELDS if k in event.data)
+    else:
+        data = str(event.data)[:EVENT_DATA_CHARS]
+    return f"{recorded.time:.3f} {event.event.value} {event.object_id} {data}"
+
+
 def _parametrize_device(metafunc: pytest.Metafunc) -> None:
     """Parametrize `device` over the leased devices of the marker's providers, else all leased."""
     leased = from_env(os.environ["LAB_DEVICES"])
@@ -276,6 +321,13 @@ def _parametrize_device(metafunc: pytest.Metafunc) -> None:
     wanted = " or ".join(providers) if providers else "device"
     skip = pytest.mark.skip(reason=f"no {wanted} leased")
     metafunc.parametrize("device", [pytest.param(None, marks=skip)])
+
+
+def _subject(request: pytest.FixtureRequest) -> str:
+    """Return the role or device id a parametrized test runs on, `""` without one."""
+    callspec = getattr(request.node, "callspec", None)
+    params = callspec.params if callspec is not None else {}
+    return str(params.get("role", params.get("device", "")))
 
 
 def _roles() -> tuple[str, ...]:

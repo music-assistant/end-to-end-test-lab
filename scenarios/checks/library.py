@@ -10,7 +10,10 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from music_assistant_models.enums import MediaType
+
 from scenarios.checks.containers import restart_role
+from scenarios.checks.context import check
 from scenarios.checks.queue import play, stop, tracks
 
 if TYPE_CHECKING:
@@ -43,6 +46,7 @@ RECENTLY_PLAYED_LIMIT = 20
 POLL_S = 0.5
 
 
+@check
 async def scan_matches_manifest(ctx: CheckContext) -> None:
     """Check the library holds the tone library, adds a new file once and drops it when gone."""
     expected = len(ctx.tones.tracks)
@@ -81,6 +85,7 @@ async def scan_matches_manifest(ctx: CheckContext) -> None:
         shutil.rmtree(EXTRA_DIR / EXTRA_ARTIST, ignore_errors=True)
 
 
+@check
 async def rows_survive_restart(ctx: CheckContext, role: str) -> None:
     """Check a favorite and a play log entry are still there after the server restarts."""
     queue_id = ctx.player_id(role)
@@ -169,8 +174,6 @@ async def _is_favorite(client: MusicAssistantClient, track: Track) -> bool:
 
 async def _was_played(client: MusicAssistantClient, track: Track) -> bool:
     """Whether the track is among the recently played tracks, fully played or not."""
-    from music_assistant_models.enums import MediaType
-
     played = await client.music.recently_played(
         limit=RECENTLY_PLAYED_LIMIT, media_types=[MediaType.TRACK], fully_played_only=False
     )

@@ -27,6 +27,7 @@ pytestmark = [
     pytest.mark.gate,
     pytest.mark.area_streams,
     pytest.mark.roles(*AREA_ROLES["streams"]),
+    pytest.mark.timeout(600),
 ]
 
 Check = Callable[[CheckContext, str], Awaitable[None]]

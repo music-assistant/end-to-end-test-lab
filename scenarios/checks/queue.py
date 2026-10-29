@@ -8,7 +8,10 @@ import time
 from collections.abc import Callable, Collection, Iterable
 from typing import TYPE_CHECKING
 
+from music_assistant_models.enums import EventType, PlaybackState, QueueOption
+
 from labctl.analyze import WINDOW
+from scenarios.checks.context import check
 from scenarios.helpers import queue_field, queue_playing, until
 
 if TYPE_CHECKING:
@@ -63,10 +66,9 @@ MAX_STALE_AFTER_NEXT_S = 1.5
 MAX_NEXT_HEARD_S = 3.0
 
 
+@check
 async def album_plays_through(ctx: CheckContext, role: str) -> None:
     """Check three album tracks play in order to the end of the queue, with no tail replayed."""
-    from music_assistant_models.enums import EventType, PlaybackState
-
     queue_id = ctx.player_id(role)
 
     def player_left_playing() -> bool:
@@ -129,10 +131,9 @@ async def album_plays_through(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def resume_advances(ctx: CheckContext, role: str) -> None:
     """Check a paused track goes silent, resumes and still advances to the next item."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(role)
     first, second = TWO_TRACKS
     try:
@@ -180,6 +181,7 @@ async def resume_advances(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def next_drops_previous(ctx: CheckContext, role: str) -> None:
     """Check next mid-track silences the skipped track at once and plays the next within 3 s."""
     queue_id = ctx.player_id(role)
@@ -206,10 +208,9 @@ async def next_drops_previous(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def now_playing_follows(ctx: CheckContext, role: str) -> None:
     """Check the queue reports track 2 as now playing within 2 s of it being heard."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(role)
     first, second = TWO_TRACKS
     name = title(ctx, second)
@@ -279,8 +280,6 @@ async def play_media(
     ctx: CheckContext, queue_id: str, media: list[Track] | str, issues: tuple[str, ...]
 ) -> float:
     """Replace the queue with `media`, wait in step `starts` until it plays; return play time."""
-    from music_assistant_models.enums import EventType, QueueOption
-
     started = time.time()
     with ctx.step("starts", issues):
         await ctx.client.player_queues.play_media(queue_id, media, QueueOption.REPLACE)
@@ -337,8 +336,6 @@ def starts_after(seg: Segment, after: float, window_s: float) -> bool:
 
 async def stop(ctx: CheckContext, queue_id: str, timeout: float = COMMAND_TIMEOUT_S) -> None:
     """Stop the queue, wait until it left playing and let the server settle before the next one."""
-    from music_assistant_models.enums import PlaybackState
-
     await ctx.client.player_queues.stop(queue_id)
     # no assert: stop runs in every check's finally and must not mask the failed step
     deadline = time.monotonic() + timeout

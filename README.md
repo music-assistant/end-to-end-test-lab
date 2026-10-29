@@ -3,12 +3,12 @@
 One command runs a Music Assistant ref against a fresh server plus virtual players on an isolated
 Docker network, captures what every player received, and returns pass/fail with JUnit XML, the MA
 log and the PCM captures. It runs in one Linux VM on an isolated network segment, or in a laptop VM
-for the virtual tier, so no lab player can reach a real speaker.
+with virtual players only, so no lab player can reach a real speaker.
 
 ```
 lab run --ref pr/7244 --areas queue        # PR gate: core plus the queue area
 lab run --ref pr/7244 --providers airplay  # core plus the AirPlay journey
-lab run --ref pr/7244 --providers spotify  # tier 2 scenarios on the Spotify account set
+lab run --ref pr/7244 --providers spotify  # music scenarios on the Spotify account set
 lab run --ref pr/7244 --providers devices  # real speakers on the bench
 lab run --ref dev                          # smoke test on one player of each kind
 lab runs                                   # recent runs with their purpose and exit code
@@ -28,7 +28,7 @@ reproducing a player bug against virtual or bench players.
 | `images/players/` | one image with every virtual player (gmediarender, squeezelite, snapclient, mpd, aiosendspin client), plus the MPD config |
 | `images/shairport/` | config mounted into the official shairport-sync image for the AirPlay role |
 | `tones/` | tone library generator and manifest |
-| `scenarios/` | pytest scenarios: `checks/` (one body per check), `gate/` (per-area journeys), `deep/` (one check per test), `tier1/`, `tier2/`; markers `gate`, `deep`, `area_*`, `provider_*`, `roles`, `tier1`, `tier2`, `hw` |
+| `scenarios/` | pytest scenarios: `checks/` (one body per check), `gate/` (per-area journeys), `deep/` (one check per test), `smoke/`, `music/`, `bench/`; markers `gate`, `deep`, `smoke`, `music`, `bench`, `area_*`, `provider_*`, `roles`, `devices` |
 | `tests/` | unit tests for the lab code itself (synthetic data only) |
 | `config/` | `lab.example.toml` (tracked) and `lab.toml` (untracked, house-specific) |
 | `deploy/` | VM bootstrap, systemd unit, docker daemon config |
@@ -73,7 +73,7 @@ no row runs `core` only. A row with areas and a `--providers` entry is two runs,
 | `providers/mpd/**` | `--providers mpd` |
 | `providers/{chromecast,sonos,wiim}/**` | device run on the matching bench device: `lab run --ref pr/<n> --providers <id>` with `nestmini-1`, `sonos-1` or `wiim-1`; `lab hw status` lists the registry |
 | `providers/{alexa,amplipi,bluesound,bose_soundtouch,fully_kiosk,hass_players,heos,local_audio,msx_bridge,musiccast,raumfeld,roku_media_assistant,samsung_wam,sonos_s1,yandex_station}/**` | no lab coverage, write that in the PR |
-| `providers/<name>/**` of type `music` | tier 2 on the matching frozen set: `lab run --ref pr/<n> --providers <domain>` with `spotify`, `apple_music`, `tidal`, `ytmusic`, `qobuz` or `deezer`. Other music providers have no lab coverage. |
+| `providers/<name>/**` of type `music` | music run on the matching frozen set: `lab run --ref pr/<n> --providers <domain>` with `spotify`, `apple_music`, `tidal`, `ytmusic`, `qobuz` or `deezer`. Other music providers have no lab coverage. |
 | `providers/<name>/**` of type `plugin` | no lab area |
 | `models/**` | every area and player journey: `lab run --ref pr/<n> --all` |
 | `mass.py`, `__main__.py`, `constants.py`, `controllers/webserver/**`, `controllers/config/core.py`, `controllers/config/migrations.py`, `controllers/config/providers.py`, `controllers/cache/**`, `controllers/tasks/**`, `controllers/discovery/**`, `controllers/dashboard/**`, `helpers/webserver.py`, `helpers/database.py`, `helpers/config_entries.py`, `helpers/aiohttp_client.py`, `helpers/logging.py`, `helpers/security.py`, `helpers/jwt_auth.py`, `helpers/oauth.py`, `helpers/pkce.py`, `helpers/ssl.py`, `helpers/webrtc_certificate.py`, `helpers/app_vars.py`, `helpers/redirect_validation.py`, `helpers/guest_access.py` | `core` |
@@ -84,13 +84,13 @@ no row runs `core` only. A row with areas and a `--providers` entry is two runs,
 ```
 lab run --ref pr/<n> --areas <a>[,<b>]     # core is always added; roles come from the areas
 lab run --ref pr/<n> --providers <player domain>   # core plus that provider's journey
-lab run --ref pr/<n> --providers <music domain>    # tier 2 on its frozen account set
+lab run --ref pr/<n> --providers <music domain>    # music run on its frozen account set
 lab run --ref pr/<n> --all                 # every area and journey on every player kind
 lab summary <run id>                       # failures per area with checkpoint and issues
 lab runs --ref pr/<n>                      # the PR's runs: purpose, exit code, rerun
 lab run --ref dev --deep                   # daily deep run, not a PR check
 lab run --ref dev --deep --providers slim,slim -k test_member_rejoins   # one deep test, no account sets
-lab run --ref pr/<n> --providers devices   # hw smoke, bench journeys and state checks on every registered device
+lab run --ref pr/<n> --providers devices   # bench play and stop, journeys and state checks on every registered device
 ```
 
 A gate (`--areas`, `--all`, or player providers alone) that fails is rerun once in a fresh
@@ -122,7 +122,7 @@ failed tests.
 
 [`SETUP.md`](SETUP.md) builds the lab from scratch: what the network and hypervisor must provide
 (with UniFi and Proxmox as examples), the VM, bootstrap, config, images, account sets, the
-isolation checks, bench devices, and a laptop variant for the virtual tier.
+isolation checks, bench devices, and a laptop variant for virtual players only.
 [`docs/runbook.md`](docs/runbook.md) covers operating it: runs, leases, account sets, adding a
 player role, maintenance. [`docs/players.md`](docs/players.md) has the verified flags per player.
 
