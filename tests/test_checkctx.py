@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import pytest
 
-from scenarios.checks.context import CheckContext
+from scenarios.checks.context import CheckContext, check
 
 
 def test_passing_step_records_checkpoint() -> None:
@@ -32,6 +32,19 @@ def test_step_without_issues() -> None:
     with ctx.step("plays"):
         pass
     assert recorded == [("checkpoint", "plays")]
+
+
+async def test_check_qualifies_its_steps() -> None:
+    """A step inside a `@check` records `<check>.<step>`."""
+
+    @check
+    async def plays_tone(ctx: CheckContext, role: str) -> None:
+        with ctx.step("starts"):
+            pass
+
+    ctx, recorded = _context()
+    await plays_tone(ctx, "dlna-1")
+    assert recorded == [("checkpoint", "plays_tone.starts")]
 
 
 def _context() -> tuple[CheckContext, list[tuple[str, object]]]:

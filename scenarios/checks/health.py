@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from scenarios.checks.context import check
 from scenarios.helpers import ma_log_errors
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ BOOT_ISSUES = ("#6729",)
 MAX_LOGGED_LINES = 20
 
 
+@check
 async def boot_clean(ctx: CheckContext) -> None:
     """Check every provider loaded, every role registered and no error was logged at boot."""
     with ctx.step("providers_loaded", BOOT_ISSUES):

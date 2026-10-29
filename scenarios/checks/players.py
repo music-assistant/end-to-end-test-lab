@@ -14,6 +14,7 @@ from music_assistant_models.enums import EventType, PlaybackState, PlayerFeature
 from music_assistant_models.errors import PlayerUnavailableError
 
 from scenarios.checks.containers import restart_role, start_role, stop_role
+from scenarios.checks.context import check
 from scenarios.checks.queue import (
     CAPTURE_SETTLE_S,
     COMMAND_TIMEOUT_S,
@@ -151,6 +152,7 @@ def partner(role: str) -> str:
     return f"{kind}-{int(index) + 1}"
 
 
+@check
 async def group_plays_in_sync(ctx: CheckContext, role: str) -> None:
     """Check a two-player group plays the same audio in sync and advances on both."""
     other = partner(role)
@@ -180,6 +182,7 @@ async def group_plays_in_sync(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def member_removed_keeps_leader(ctx: CheckContext, role: str) -> None:
     """Check ungrouping a member leaves the leader playing and the member idle and usable."""
     other = partner(role)
@@ -232,6 +235,7 @@ async def member_removed_keeps_leader(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def group_skip_intact(ctx: CheckContext, role: str) -> None:
     """Check next on a group skips one track on both players and keeps the group together."""
     other = partner(role)
@@ -264,6 +268,7 @@ async def group_skip_intact(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def group_announce_restores(ctx: CheckContext, role: str) -> None:
     """Check an announcement on a group member plays and the group resumes the interrupted track."""
     other = partner(role)
@@ -291,6 +296,7 @@ async def group_announce_restores(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def member_rejoins(ctx: CheckContext, role: str) -> None:
     """Check a static syncgroup member whose player restarts drops out, returns and rejoins."""
     other = partner(role)
@@ -324,6 +330,7 @@ async def member_rejoins(ctx: CheckContext, role: str) -> None:
             await _remove_syncgroup(ctx, group_id, leader, member)
 
 
+@check
 async def member_restart_ungroups(ctx: CheckContext, role: str) -> None:
     """Check a native group member whose player restarts leaves the group; the leader plays on."""
     other = partner(role)
@@ -359,6 +366,7 @@ async def member_restart_ungroups(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def muted_member_stays_muted(ctx: CheckContext, role: str) -> None:
     """Check a group volume change leaves a muted member muted and changes the others."""
     other = partner(role)
@@ -395,6 +403,7 @@ async def muted_member_stays_muted(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def volume_set_audible(ctx: CheckContext, role: str) -> None:
     """Check a lower volume makes the capture quieter and full volume brings it back."""
     queue_id = ctx.player_id(role)
@@ -427,6 +436,7 @@ async def volume_set_audible(ctx: CheckContext, role: str) -> None:
         await _restore_volume(ctx, queue_id)
 
 
+@check
 async def group_volume_average(ctx: CheckContext, role: str) -> None:
     """Check the group volume reports the loudest member and moves every member when set."""
     other = partner(role)
@@ -471,6 +481,7 @@ async def group_volume_average(ctx: CheckContext, role: str) -> None:
         await _teardown(ctx, leader, member)
 
 
+@check
 async def volume_after_pause(ctx: CheckContext, role: str) -> None:
     """Check the volume stays put through play, pause, resume and next."""
     queue_id = ctx.player_id(role)
@@ -493,6 +504,7 @@ async def volume_after_pause(ctx: CheckContext, role: str) -> None:
         await _restore_volume(ctx, queue_id)
 
 
+@check
 async def pause_holds(ctx: CheckContext, role: str) -> None:
     """Check a pause goes silent, holds for 20 s and resumes where it paused."""
     queue_id = ctx.player_id(role)
@@ -548,6 +560,7 @@ async def pause_holds(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def disconnect_closes_stream(ctx: CheckContext, role: str) -> None:
     """Check a stopped player goes unavailable, its queue stops, and the player returns."""
     queue_id = ctx.player_id(role)
@@ -577,6 +590,7 @@ async def disconnect_closes_stream(ctx: CheckContext, role: str) -> None:
             await stop(ctx, queue_id)
 
 
+@check
 async def announce_ducks_and_resumes(ctx: CheckContext, role: str) -> None:
     """Check an announcement over music plays, then the music resumes at its volume and place."""
     queue_id = ctx.player_id(role)
@@ -628,6 +642,7 @@ async def announce_ducks_and_resumes(ctx: CheckContext, role: str) -> None:
         await _restore_volume(ctx, queue_id)
 
 
+@check
 async def announce_idle_only_clip(ctx: CheckContext, role: str) -> None:
     """Check an announcement on an idle player plays the clip and nothing after it."""
     queue_id = ctx.player_id(role)
@@ -648,6 +663,7 @@ async def announce_idle_only_clip(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def announce_short_and_back_to_back(ctx: CheckContext, role: str) -> None:
     """Check a 1.5 s clip plays whole, alone, twice in a row and after the chime."""
     queue_id = ctx.player_id(role)

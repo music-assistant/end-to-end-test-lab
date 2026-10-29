@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from music_assistant_models.enums import EventType, PlaybackState, QueueOption
 
 from labctl.analyze import WINDOW
+from scenarios.checks.context import check
 from scenarios.helpers import queue_field, queue_playing, until
 
 if TYPE_CHECKING:
@@ -65,6 +66,7 @@ MAX_STALE_AFTER_NEXT_S = 1.5
 MAX_NEXT_HEARD_S = 3.0
 
 
+@check
 async def album_plays_through(ctx: CheckContext, role: str) -> None:
     """Check three album tracks play in order to the end of the queue, with no tail replayed."""
     queue_id = ctx.player_id(role)
@@ -129,6 +131,7 @@ async def album_plays_through(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def resume_advances(ctx: CheckContext, role: str) -> None:
     """Check a paused track goes silent, resumes and still advances to the next item."""
     queue_id = ctx.player_id(role)
@@ -178,6 +181,7 @@ async def resume_advances(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def next_drops_previous(ctx: CheckContext, role: str) -> None:
     """Check next mid-track silences the skipped track at once and plays the next within 3 s."""
     queue_id = ctx.player_id(role)
@@ -204,6 +208,7 @@ async def next_drops_previous(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def now_playing_follows(ctx: CheckContext, role: str) -> None:
     """Check the queue reports track 2 as now playing within 2 s of it being heard."""
     queue_id = ctx.player_id(role)

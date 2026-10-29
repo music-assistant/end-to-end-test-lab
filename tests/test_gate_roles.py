@@ -14,11 +14,13 @@ GATE = Path(__file__).parent.parent / "scenarios" / "gate"
 def test_roles_within_area(path: Path) -> None:
     """Area roles stay within `gate_roles` of the area, a journey's on its domain's `<kind>-1`."""
     tree = ast.parse(path.read_text())
-    module_marks = next(
-        node.value.elts
+    pytestmark = next(
+        node.value
         for node in tree.body
         if isinstance(node, ast.Assign) and ast.unparse(node.targets[0]) == "pytestmark"
     )
+    assert isinstance(pytestmark, ast.List | ast.Tuple), f"{path.name}: pytestmark is not a list"
+    module_marks = pytestmark.elts
     area = _marker_suffix(module_marks, "area_")
     functions = [node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)]
     for marks in [module_marks, *(node.decorator_list for node in functions)]:
@@ -26,7 +28,9 @@ def test_roles_within_area(path: Path) -> None:
         if not roles:
             continue
         domain = _marker_suffix(marks, "provider_")
-        allowed = _domain_roles(domain) if domain else areas.gate_roles((area,))
+        if domain is None:
+            assert area is not None, f"{path.name}: no area_ or provider_ marker"
+        allowed = areas.gate_roles((area,)) if domain is None else _domain_roles(domain)
         assert set(roles) <= set(allowed), f"{path.name}: {roles} outside {allowed}"
 
 
@@ -48,6 +52,7 @@ def _roles(mark: ast.expr) -> list[str]:
     roles: list[str] = []
     for arg in mark.args:
         if isinstance(arg, ast.Starred):
+            assert isinstance(arg.value, ast.Subscript)
             roles += areas.AREA_ROLES[ast.literal_eval(arg.value.slice)]
         else:
             roles.append(ast.literal_eval(arg))

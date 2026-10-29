@@ -13,6 +13,7 @@ import aiohttp
 from music_assistant_models.enums import EventType, PlaybackState, QueueOption
 from music_assistant_models.errors import MusicAssistantError
 
+from scenarios.checks.context import check
 from scenarios.checks.queue import (
     ADVANCE_MARGIN_S,
     CAPTURE_SETTLE_S,
@@ -127,6 +128,7 @@ MAX_HLS_GAP_S = 1.0
 REFUSED_QUIET_S = 5.0
 
 
+@check
 async def flow_continuous(ctx: CheckContext, role: str) -> None:
     """Check an album plays as one flow stream in order, without silence, and ends for good."""
     queue_id = ctx.player_id(role)
@@ -175,6 +177,7 @@ async def flow_continuous(ctx: CheckContext, role: str) -> None:
             await set_flow_mode(ctx, role, restore)
 
 
+@check
 async def flow_next_skips_one(ctx: CheckContext, role: str) -> None:
     """Check next in flow mode moves exactly one track ahead, twice."""
     queue_id = ctx.player_id(role)
@@ -226,6 +229,7 @@ async def flow_next_skips_one(ctx: CheckContext, role: str) -> None:
             await set_flow_mode(ctx, role, restore)
 
 
+@check
 async def crossfade_overlap(ctx: CheckContext, role: str) -> None:
     """Check a 4 s standard crossfade overlaps two tracks with no gap and no skip."""
     queue_id = ctx.player_id(role)
@@ -284,6 +288,7 @@ async def crossfade_overlap(ctx: CheckContext, role: str) -> None:
         await _save_queue_settings(ctx, previous)
 
 
+@check
 async def seek_resumes(ctx: CheckContext, role: str) -> None:
     """Check a seek reports the new position, keeps sounding and plays on from there."""
     queue_id = ctx.player_id(role)
@@ -335,6 +340,7 @@ async def seek_resumes(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def elapsed_tracks_pause(ctx: CheckContext, role: str) -> None:
     """Check elapsed time stands still while paused, runs on after resume and resets per track."""
     queue_id = ctx.player_id(role)
@@ -398,6 +404,7 @@ async def elapsed_tracks_pause(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def stop_after_end_position(ctx: CheckContext, role: str) -> None:
     """Check a track that played to its end never reports a position past it and replays from 0."""
     queue_id = ctx.player_id(role)
@@ -447,6 +454,7 @@ async def stop_after_end_position(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def short_file_plays(ctx: CheckContext, role: str) -> None:
     """Check a 1.5 s track is heard and the queue advances past it."""
     queue_id = ctx.player_id(role)
@@ -474,6 +482,7 @@ async def short_file_plays(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def radio_start_latency(ctx: CheckContext, role: str) -> None:
     """Check an ICY radio stream is heard within 4 s of the play command."""
     queue_id = ctx.player_id(role)
@@ -488,6 +497,7 @@ async def radio_start_latency(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def radio_icy_plays(ctx: CheckContext, role: str) -> None:
     """Check an ICY stream plays, follows its stream titles and survives a dropped connection."""
     queue_id = ctx.player_id(role)
@@ -530,6 +540,7 @@ async def radio_icy_plays(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def radio_hls_plays(ctx: CheckContext, role: str) -> None:
     """Check a live HLS stream plays for 30 s without stalling."""
     queue_id = ctx.player_id(role)
@@ -552,6 +563,7 @@ async def radio_hls_plays(ctx: CheckContext, role: str) -> None:
         await stop(ctx, queue_id)
 
 
+@check
 async def radio_403_rejected(ctx: CheckContext, role: str) -> None:
     """Check a stream that answers 403 is refused at once and the player stays silent."""
     queue_id = ctx.player_id(role)

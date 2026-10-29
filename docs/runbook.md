@@ -65,7 +65,7 @@ Which areas a PR needs is in [README.md](../README.md#which-areas-for-my-diff).
 
 Ref forms are `dev`, `stable`, any branch name, a sha, or `pr/<n>` (fetched from `refs/pull/<n>/head`). The mirror is fetched on every run. The base image follows from the sha: a sha on `stable`, or forked from `stable` more recently than from `dev`, runs on the stable image, anything else on the nightly digest in `lab.toml`. The ref's checkout is mounted read-only at `/src`, and the server container installs the ref's `requirements_all.txt` at start through a shared uv cache.
 
-The CLI prints the run id and sha, how long bootstrap took, and a closing line with the exit code, JUnit totals, duration and output directory. The exit code of `lab run` is pytest's: 0 passed, 1 test failures, 5 nothing collected. Each test fails when it overruns its layer's budget (`pytest.mark.timeout` in the directory's `pytestmark`, else 900 s from `pyproject.toml`), and the run goes on with the next test. A tests container still running after 2 h is killed and `lab run` exits 124. If labd dropped the run's lease during the run (it expired or was released), `lab run` still writes `summary.json` and then fails with `lease <id> was lost during the run`.
+The CLI prints the run id and sha, how long bootstrap took, and a closing line with the exit code, JUnit totals, duration and output directory. The exit code of `lab run` is pytest's: 0 passed, 1 test failures, 5 nothing collected. Each test fails when it overruns its layer's budget (`pytest.mark.timeout` in the directory's `pytestmark`, else 900 s from `pyproject.toml`), and the run goes on with the next test; the `ctx` fixture stops the test's player at teardown, since a test killed by its budget runs its own `finally` only after the client has closed. A tests container still running after 2 h is killed and `lab run` exits 124. If labd dropped the run's lease during the run (it expired or was released), `lab run` still writes `summary.json` and then fails with `lease <id> was lost during the run`.
 
 Ctrl-C tears the run down (unless `--keep`) and then releases the lease.
 
@@ -125,7 +125,7 @@ EOF
 ssh lab 'ffmpeg -f s16le -ar 48000 -ac 2 -i /srv/lab/runs/<run id>/captures/airplay-1.pcm /tmp/airplay-1.wav'
 ```
 
-6. A failed testcase in `junit.xml` has `checkpoint` and `issues` properties. They name the step that failed and the support issues it guards.
+6. A failed testcase in `junit.xml` has `checkpoint` and `issues` properties, and `failed_checkpoint` and `failed_issues` for the step that failed. A checkpoint is `<check>.<step>`, such as `album_plays_through.tones_in_order`, so a journey's failure names the check as well as the step. `started_at` and `ended_at` are the test's wall-clock start and end in epoch seconds, the clock of the capture timelines and of the events below. The failure text of a test that failed in its call phase ends with an `events` section: the test's last 20 server events, one per line with time, event type, object id and the state, index, elapsed time or volume they carry.
 
 `--keep` skips teardown, so the compose project `lab-<run id>` stays up and `ma.log` does not exist yet. The server is published on the VM's loopback only. To poke at it:
 
@@ -251,8 +251,9 @@ on the server's loopback and publishes its port in `/data/spotify/<instance>/sol
 Music tests carry no area marker: their `area` property is `music_<provider>` of the account
 set (`ACCOUNT_SET_PROVIDERS` in `labctl/areas.py`), passed as `LAB_ACCOUNT_SET`.
 
-The tracks used, the boundary gap and the stop latency are JUnit testsuite properties in
-`junit.xml`.
+The tracks used (`tracks` or `track`), the boundary gap (`boundary_gap_s`), the stop latency
+(`stop_s`), the reloaded providers (`providers`) and their time to available (`available_s`) are
+testcase properties in `junit.xml`, next to the checkpoints.
 
 ### Re-login
 
@@ -295,6 +296,20 @@ lab run --ref dev
 
 6. Add the verified command, provider setup and dead ends to `docs/players.md`, and extend the compose rendering tests in `tests/test_runs.py`.
 
+## Adding a check
+
+A check is one behaviour of the server, checked on one role or device, in a module of `scenarios/checks/`. Tests call checks; they do not hold the logic themselves.
+
+- Signature `@check` + `async def <name>(ctx: CheckContext, role: str) -> None` (`device: str` for bench checks). `@check` from `scenarios/checks/context.py` names the checkpoints of its steps `<name>.<step>`.
+- Wrap each phase in `with ctx.step("<step>", ISSUES):`, where `ISSUES` is a module constant with the support issues and PRs the check guards, such as `("#6860",)`. A failure records `failed_checkpoint` and adds the checkpoint to the error.
+- Whatever the check starts, it stops in a `finally`, so a failed step does not leave a player playing into the next test.
+- Timeouts and tolerances are module constants. Give each one that is not self-explanatory a one-line comment with the why, such as a measurement or the server behaviour it allows for.
+- Record measurements with `ctx.record_property("<name>_s", value)`; the role is already in the node id.
+- Give every check one deep test of its own in `scenarios/deep/test_<area>.py`, a one-liner on the area's roles via `pytest.mark.roles(*AREA_ROLES["<area>"])` (bench checks get a test in `scenarios/bench/`, music checks in `scenarios/music/`). Gate journeys in `scenarios/gate/` chain checks on the same roles.
+- New roles for an area go in `AREA_ROLES` in `labctl/areas.py`, not in a test's marker.
+
+Two unit tests enforce this: `tests/test_scenario_coverage.py` fails on a check without `@check` or without a deep, bench, music or smoke test that calls it, and `tests/test_gate_roles.py` fails when a gate module asks for roles outside `gate_roles` of its area.
+
 ## Hardware
 
 Real speakers on the bench join a run with `--providers <device id>`, or `--providers devices` for all of them. Each run leases its devices exclusively, so a second run asking for a busy device queues while runs on other devices go ahead.
@@ -332,7 +347,7 @@ ssh lab 'journalctl -u lab-gc'
 ssh lab 'docker ps'              # leftover lab-<run id> projects point at forgotten --keep runs
 ```
 
-Images. The server image `lab/ma:<tag>` is rebuilt by every `lab run` with `--pull`, so a tag-only base such as `server:stable` moves to its latest release; it is a cached no-op unless the base or `images/ma/entrypoint.sh` changed. The players image is not: rebuild it after a change to `images/players/` or to `labctl/pacer.py` or `labctl/sendspin_client.py`, otherwise the old code runs (the first AirPlay run after a pacer change died on a missing FIFO). Scenarios and `labctl` are copied from the synced repo into the run's `src/` when the run is created and need no rebuild.
+Images. The server image `lab/ma:<tag>` is rebuilt by every `lab run` with `--pull`, so a tag-only base such as `server:stable` moves to its latest release; it is a cached no-op unless the base or `images/ma/entrypoint.sh` changed. The players image is not: rebuild it after a change to `images/players/`, to `labctl/pacer.py` or `labctl/sendspin_client.py`, or to the dependencies in `pyproject.toml` (the tests run from the venv baked into it), otherwise the old code runs (the first AirPlay run after a pacer change died on a missing FIFO). Scenarios and `labctl` are copied from the synced repo into the run's `src/` when the run is created and need no rebuild.
 
 Nightly digest. The nightly image is pinned in `[images] nightly` in `/srv/lab/src/config/lab.toml`. To move it, pull the tag, read the digest, edit the line, then prewarm:
 

@@ -184,7 +184,7 @@ What each check asserts:
 - `bench_seek`: a seek to 40 s in `a1t4` reports 39 to 48 s within 8 s, and the track ends 12 to
   35 s after the seek (no restart from 0, no early end).
 - `bench_stop_position`: `a3t1` played to its end never reports an elapsed time or resume
-  position past its length, and a replay reports under 5 s elapsed 2 s after it plays.
+  position over 1 s past its length, and a replay reports under 5 s elapsed 2 s after it plays.
 - `bench_next_skips_one`: next 3 s into the album reaches index 1 and not index 2 within 5 s.
 - `bench_group_skip`: with the second device grouped, next reaches index 1, both players report
   playing and the member stays synced to the leader.
@@ -195,13 +195,12 @@ marker, so they run in the nightly routine's device run and in per-PR device run
 Devices bootstrap at volume 1 and the volume checks stay at 3 or below, then set 1 again.
 
 - `bench_volume_reported`: with `a1t4` playing, volume 3 is reported within 10 s, then volume 1.
-  A device without `VOLUME_SET` records `volume_checked: False` and is not checked.
+  A device without `VOLUME_SET` skips the test (`<device> has no VOLUME_SET`).
 - `bench_mute`: with `a1t4` playing at volume 3, mute is reported within 10 s and unmute reports
-  unmuted at volume 3. A device without `VOLUME_SET` and `VOLUME_MUTE` records
-  `mute_checked: False`.
+  unmuted at volume 3. A device without `VOLUME_SET` or `VOLUME_MUTE` skips the test.
 - `bench_volume_kept`: volume 3 is still reported 1 s after the album reports playing and 1 s
   after each of pause, resume and next, recorded as `volume_after_<command>`. Same
-  `volume_checked` rule.
+  `VOLUME_SET` skip.
 - `bench_long_pause`: `a1t4` paused after 5 s leaves `playing`; the queue is `idle` within 40 s
   (`idle_after_s`: at once for a stop-style pause, the player queue controller's 30 s limit for a
   held one), still `idle` 60 s after the pause, and resume plays on from the paused position

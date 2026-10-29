@@ -1,32 +1,49 @@
-"""Every check in scenarios/checks has a deep or bench test that calls it."""
+"""Every check in scenarios/checks is a `@check` and has a test of its own that calls it."""
 
 import ast
-import re
 from pathlib import Path
 
 SCENARIOS = Path(__file__).parent.parent / "scenarios"
-SUBJECTS = ("role", "device")
+# public `(ctx, ...) -> None` coroutines in scenarios/checks that are helpers, not checks
+HELPERS = ("stop",)
 
 
 def test_every_check_has_a_test() -> None:
-    """A check is a public `async def` taking `(ctx, role|device, ...)` and returning None."""
-    layers = (SCENARIOS / "deep", SCENARIOS / "bench")
-    tests = "\n".join(path.read_text() for layer in layers for path in layer.glob("*.py"))
-    untested = [name for name in _checks() if not re.search(rf"\b{name}\b", tests)]
-    assert not untested, f"checks without a deep or bench test: {untested}"
+    """Every check is used by name in a test, an import alone does not count."""
+    # gate journeys only chain checks; music and smoke checks cannot run in a deep run
+    layers = (SCENARIOS / "deep", SCENARIOS / "bench", SCENARIOS / "music", SCENARIOS / "smoke")
+    used = {
+        node.id
+        for layer in layers
+        for path in layer.glob("*.py")
+        for node in ast.walk(ast.parse(path.read_text()))
+        if isinstance(node, ast.Name)
+    }
+    untested = [node.name for node in _checks() if node.name not in used]
+    assert not untested, f"checks without a deep, bench, music or smoke test: {untested}"
 
 
-def _checks() -> list[str]:
-    """Return the names of the check functions in scenarios/checks, context.py excluded."""
-    names: list[str] = []
+def test_every_check_is_decorated() -> None:
+    """Every check carries `@check`, so its checkpoints are named `<check>.<step>`."""
+    bare = [
+        node.name
+        for node in _checks()
+        if not any(ast.unparse(decorator) == "check" for decorator in node.decorator_list)
+    ]
+    assert not bare, f"checks without @check: {bare}"
+
+
+def _checks() -> list[ast.AsyncFunctionDef]:
+    """Return the public `(ctx, ...) -> None` coroutines of scenarios/checks that are checks."""
+    checks: list[ast.AsyncFunctionDef] = []
     for path in sorted((SCENARIOS / "checks").glob("*.py")):
         if path.name == "context.py":
             continue
         for node in ast.parse(path.read_text()).body:
             if not isinstance(node, ast.AsyncFunctionDef) or node.name.startswith("_"):
                 continue
-            params = [arg.arg for arg in node.args.args[:2]]
+            params = [arg.arg for arg in node.args.args]
             returns_none = isinstance(node.returns, ast.Constant) and node.returns.value is None
-            if len(params) == 2 and params[0] == "ctx" and params[1] in SUBJECTS and returns_none:
-                names.append(node.name)
-    return names
+            if params[:1] == ["ctx"] and returns_none and node.name not in HELPERS:
+                checks.append(node)
+    return checks

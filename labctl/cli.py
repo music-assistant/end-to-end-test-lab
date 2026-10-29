@@ -376,11 +376,13 @@ def _rerun(
     click.echo(f"run {first.id}: rerunning {len(failed)} failed tests as run {rerun.id}")
     selection = runs.Selection(marker, node_ids=failed)
     exit_code = _test(config, lease, rerun, checkout, None, selection, False, started)
-    failed_again = runs.failed_node_ids(rerun.dir / "junit.xml")
+    rerun_junit = rerun.dir / "junit.xml"
+    # a rerun whose pytest died counts every test as failed again
+    failed_again = runs.failed_node_ids(rerun_junit) if rerun_junit.exists() else failed
     reruns = runs.rerun_outcomes(failed, failed_again)
     runs.record_rerun(first, rerun.id, reruns)
     first_checkpoints = runs.failed_checkpoints(first.dir / "junit.xml")
-    second_checkpoints = runs.failed_checkpoints(rerun.dir / "junit.xml")
+    second_checkpoints = runs.failed_checkpoints(rerun_junit) if rerun_junit.exists() else {}
     flakes.record(
         config.flakes_file, first.id, checkout.ref, reruns, first_checkpoints, second_checkpoints
     )
