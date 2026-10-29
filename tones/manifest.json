@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "chirp": {
+    "duration_s": 0.2,
+    "f0_hz": 500.0,
+    "f1_hz": 8000.0
+  },
+  "tracks": [
+    {
+      "id": "a1t1",
+      "artist": "Lab Artist One",
+      "album": "Tone Album One",
+      "title": "Tone A1T1",
+      "track": 1,
+      "date": "2024",
+      "path": "Lab Artist One/Tone Album One/01 - Tone A1T1.flac",
+      "freq_hz": 433.59375,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a1t2",
+      "artist": "Lab Artist One",
+      "album": "Tone Album One",
+      "title": "Tone A1T2",
+      "track": 2,
+      "date": "2024",
+      "path": "Lab Artist One/Tone Album One/02 - Tone A1T2.flac",
+      "freq_hz": 503.90625,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a1t3",
+      "artist": "Lab Artist One",
+      "album": "Tone Album One",
+      "title": "Tone A1T3",
+      "track": 3,
+      "date": "2024",
+      "path": "Lab Artist One/Tone Album One/03 - Tone A1T3.flac",
+      "freq_hz": 621.09375,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a1t4",
+      "artist": "Lab Artist One",
+      "album": "Tone Album One",
+      "title": "Tone A1T4",
+      "track": 4,
+      "date": "2024",
+      "path": "Lab Artist One/Tone Album One/04 - Tone A1T4.flac",
+      "freq_hz": 714.84375,
+      "duration_s": 60.0
+    },
+    {
+      "id": "a2t1",
+      "artist": "Lab Artist Two",
+      "album": "Tone Album Two",
+      "title": "Tone A2T1",
+      "track": 1,
+      "date": "2025",
+      "path": "Lab Artist Two/Tone Album Two/01 - Tone A2T1.flac",
+      "freq_hz": 832.03125,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a2t2",
+      "artist": "Lab Artist Two",
+      "album": "Tone Album Two",
+      "title": "Tone A2T2",
+      "track": 2,
+      "date": "2025",
+      "path": "Lab Artist Two/Tone Album Two/02 - Tone A2T2.flac",
+      "freq_hz": 972.65625,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a2t3",
+      "artist": "Lab Artist Two",
+      "album": "Tone Album Two",
+      "title": "Tone A2T3",
+      "track": 3,
+      "date": "2025",
+      "path": "Lab Artist Two/Tone Album Two/03 - Tone A2T3.flac",
+      "freq_hz": 1136.71875,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a2t4",
+      "artist": "Lab Artist Two",
+      "album": "Tone Album Two",
+      "title": "Tone A2T4",
+      "track": 4,
+      "date": "2025",
+      "path": "Lab Artist Two/Tone Album Two/04 - Tone A2T4.flac",
+      "freq_hz": 1324.21875,
+      "duration_s": 25.0
+    },
+    {
+      "id": "a3t1",
+      "artist": "Lab Artist Three",
+      "album": "Tone Album Three",
+      "title": "Tone A3T1",
+      "track": 1,
+      "date": "2024",
+      "path": "Lab Artist Three/Tone Album Three/01 - Tone A3T1.flac",
+      "freq_hz": 1652.34375,
+      "duration_s": 10.0
+    },
+    {
+      "id": "a3t2",
+      "artist": "Lab Artist Three",
+      "album": "Tone Album Three",
+      "title": "Tone A3T2",
+      "track": 2,
+      "date": "2024",
+      "path": "Lab Artist Three/Tone Album Three/02 - Tone A3T2.flac",
+      "freq_hz": 1746.09375,
+      "duration_s": 10.0
+    },
+    {
+      "id": "a3t3",
+      "artist": "Lab Artist Three",
+      "album": "Tone Album Three",
+      "title": "Tone A3T3",
+      "track": 3,
+      "date": "2024",
+      "path": "Lab Artist Three/Tone Album Three/03 - Tone A3T3.flac",
+      "freq_hz": 1863.28125,
+      "duration_s": 10.0
+    },
+    {
+      "id": "a4t1",
+      "artist": "Lab Artist Four",
+      "album": "Tone Album Four",
+      "title": "Tone A4T1",
+      "track": 1,
+      "date": "2024",
+      "path": "Lab Artist Four/Tone Album Four/01 - Tone A4T1.flac",
+      "freq_hz": 1417.96875,
+      "duration_s": 1.5
+    }
+  ]
+}

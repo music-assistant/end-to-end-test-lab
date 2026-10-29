@@ -1,0 +1,9 @@
+# house-specific values never leave this machine
+config/lab.toml
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pcm
+*.stamps
+*.egg-info/

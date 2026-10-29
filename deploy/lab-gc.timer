@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily lab garbage collection
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

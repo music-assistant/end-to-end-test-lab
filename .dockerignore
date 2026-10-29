@@ -1,0 +1,12 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+*.egg-info
+build
+config/lab.toml
+runs
+captures
+*.pcm
+*.stamps

@@ -1,0 +1,16 @@
+[Unit]
+Description=Music Assistant lab lease broker
+After=network-online.target
+# the lab package is installed by bootstrap-vm.sh after the first rsync
+ConditionPathExists=/srv/lab/src/.venv/bin/labd
+
+[Service]
+User=lab
+Group=lab
+Environment=LAB_CONFIG=/srv/lab/src/config/lab.toml
+ExecStart=/srv/lab/src/.venv/bin/labd
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

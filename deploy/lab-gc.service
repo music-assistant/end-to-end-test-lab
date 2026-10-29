@@ -1,0 +1,9 @@
+[Unit]
+Description=Music Assistant lab: remove old runs and orphan worktrees
+ConditionPathExists=/srv/lab/src/.venv/bin/labctl
+
+[Service]
+Type=oneshot
+User=lab
+Environment=LAB_CONFIG=/srv/lab/src/config/lab.toml
+ExecStart=/srv/lab/src/.venv/bin/labctl gc --days 14

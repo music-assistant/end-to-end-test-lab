@@ -1,0 +1,52 @@
+# Copy to config/lab.toml (untracked) and fill in the house-specific values.
+
+[vm]
+host = "10.50.0.10"             # lab VM address on VLAN 50
+user = "lab"
+root = "/srv/lab"               # everything the lab owns on the VM lives under here
+
+[broker]
+socket = "/srv/lab/labd.sock"
+state_file = "/srv/lab/state.json"
+capacity = 2                    # concurrent runs
+lease_ttl_s = 120
+heartbeat_s = 30
+keep_ttl_s = 14400               # how long a run kept with --keep holds its lease
+
+[refs]
+mirror = "/srv/lab/server.git"
+upstream = "https://github.com/music-assistant/server.git"
+
+[images]
+# Official server images the lab layers its entrypoint on. Pin nightly by digest so a run
+# is reproducible; stable follows the tag and every run pulls its latest.
+nightly = "ghcr.io/music-assistant/server:nightly@sha256:REPLACE_ME"
+stable = "ghcr.io/music-assistant/server:stable"
+shairport = "mikebrady/shairport-sync:latest"
+# PO token server for the YT Music provider, a sidecar of login instances and tier 2 runs
+potoken = "brainicism/bgutil-ytdlp-pot-provider:latest"
+
+[accounts]
+# Tier 2 account sets: name = path of the golden data dir on the VM. `lab accounts freeze <set>`
+# appends one line per set below these comments, for example:
+# spotify-a = "/srv/lab/accounts/spotify-a/data"
+
+[secrets]
+app_vars_file = "/srv/lab/secrets/app_vars.json"
+
+[hardware]
+# Shared macvlan network device runs join, on VLAN 50; `lab hw init` creates it and the host shim.
+network = "lab-hw"
+parent = "eth0"                     # VM interface on the lab VLAN
+subnet = "10.50.0.0/24"
+gateway = "10.50.0.1"
+ip_range = "10.50.0.32/27"          # container addresses, outside the DHCP pool
+shim = "10.50.0.11"                 # host side of the shim, reserved in the network
+
+[devices]
+# Real players on the bench: id = { provider = MA provider domain, name = player name in MA }.
+# Ids follow <kind>-<n>; the kind must not be a virtual player kind (sendspin, airplay, ...).
+sonos-1 = { provider = "sonos", name = "Office Sonos" }
+homepod-1 = { provider = "airplay", name = "Office HomePod" }
+nestmini-1 = { provider = "chromecast", name = "Office Nest Mini" }
+wiim-1 = { provider = "wiim", name = "Office WiiM" }

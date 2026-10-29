@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Client-side wrapper: sync this repo to the lab VM, then run labctl there.
+set -euo pipefail
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+LAB_SSH_HOST="${LAB_SSH_HOST:-lab}"
+LAB_SRC="${LAB_SRC:-/srv/lab/src}"
+
+rsync -az --delete \
+  --exclude .git --exclude .venv --exclude __pycache__ --exclude .pytest_cache \
+  --exclude 'config/lab.toml' \
+  "$REPO_DIR/" "$LAB_SSH_HOST:$LAB_SRC/"
+# -t only when we have a terminal, so scripted calls do not get the pseudo-terminal warning
+TTY=""; [ -t 0 ] && TTY="-t"
+# ssh joins its arguments into one remote command line, so quote them for the remote shell
+# shellcheck disable=SC2086
+exec ssh $TTY "$LAB_SSH_HOST" "$LAB_SRC/.venv/bin/labctl $(printf '%q ' "$@")"
