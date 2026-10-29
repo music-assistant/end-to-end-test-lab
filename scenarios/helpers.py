@@ -1,4 +1,4 @@
-"""Helpers shared by tier 2 scenarios: track selection, queue events, server log, Soloist engine."""
+"""Helpers shared by music scenarios: track selection, queue events, server log, Soloist engine."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from labctl.analyze import Segment
 
-# the account golden, mounted read-only into the tests container of a tier 2 run
+# the account golden, mounted read-only into the tests container of a music run
 DATA_DIR = Path("/data")
 MA_LOG = DATA_DIR / "musicassistant.log"
 # the level field after the timestamp of a server log line

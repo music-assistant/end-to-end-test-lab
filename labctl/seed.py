@@ -1,4 +1,4 @@
-"""Tier 1 golden data dir and the per-run data dir seeded from it.
+"""Golden data dir of runs without an account set, and the per-run data dir seeded from it.
 
 `golden/tier1/` holds `settings.json`, `auth.db` (lab admin user, JWT secret) and `token`
 (a long-lived token for that user). Settings keys the lab sets in `settings.json`:
@@ -37,7 +37,7 @@ LAB_USER = "lab"
 
 
 def ensure_golden(config: LabConfig, worktree: Path, ma_image: str) -> Path:
-    """Return the tier 1 golden dir, building it on a throwaway boot when missing."""
+    """Return the golden of runs without an account set, built on a throwaway boot when missing."""
     golden = config.golden_dir / "tier1"
     if (golden / TOKEN_FILE).exists():
         return golden

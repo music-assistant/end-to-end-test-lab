@@ -23,8 +23,8 @@ GATE_JUNIT = """<?xml version="1.0" encoding="utf-8"?>
 <testcase classname="scenarios.gate.test_core" name="test_skip"><skipped/></testcase>
 </testsuite></testsuites>
 """
-TIER1 = runs.Selection("tier1")
-TIER2 = runs.Selection("tier2")
+SMOKE = runs.Selection("smoke")
+MUSIC = runs.Selection("music")
 
 
 @pytest.fixture
@@ -39,7 +39,7 @@ def render(config: LabConfig, players: str) -> dict[str, dict[str, object]]:
     """Render the compose services of a run with the given player kinds."""
     run = runs.Run("r1", config.runs_dir / "r1", runs.parse_roles(players))
     project = runs.render_compose(
-        run, config, Path("/wt"), "lab/ma:nightly", "tok", runs.Selection("tier1", "smoke")
+        run, config, Path("/wt"), "lab/ma:nightly", "tok", runs.Selection("smoke", "smoke")
     )
     services: dict[str, dict[str, object]] = project["services"]
     return services
@@ -103,7 +103,7 @@ def test_fifo_player(config: LabConfig, kind: str, command_head: list[str]) -> N
     """A FIFO-writing player starts after its pacer sidecar and shares the FIFO volume with it."""
     role = f"{kind}-1"
     project = runs.render_compose(
-        runs.Run("r1", config.runs_dir / "r1", (role,)), config, Path("/wt"), "img", "tok", TIER1
+        runs.Run("r1", config.runs_dir / "r1", (role,)), config, Path("/wt"), "img", "tok", SMOKE
     )
     services = project["services"]
     assert list(services) == ["ma", "radio", f"{role}-pacer", role, "tests"]
@@ -121,25 +121,25 @@ def test_load_roles_from_compose(config: LabConfig) -> None:
     """Pacer sidecars are not roles when a kept run is loaded back."""
     run = runs.Run("r1", config.runs_dir / "r1", runs.parse_roles("slim,sendspin"))
     run.dir.mkdir(parents=True)
-    runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER1))
+    runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", SMOKE))
     (run.dir / runs.RUN_META).write_text("{}")
     assert runs.load(config, "r1").roles == ("slim-1", "sendspin-1")
 
 
-def test_tier2_golden_and_app_vars(config: LabConfig, tmp_path: Path) -> None:
-    """Tier 2 mounts the account golden in place and the app vars file read-only."""
+def test_music_golden_and_app_vars(config: LabConfig, tmp_path: Path) -> None:
+    """A music run mounts the account golden in place and the app vars file read-only."""
     app_vars = tmp_path / "app_vars.json"
     app_vars.write_text("{}")
     config = dataclasses.replace(config, app_vars_file=app_vars)
     golden = tmp_path / "accounts" / "spotify-a" / "data"
     run = runs.Run("r1", config.runs_dir / "r1", ("sendspin-1",), golden)
-    project = runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER2)
+    project = runs.render_compose(run, config, Path("/wt"), "img", "tok", MUSIC)
     ma, tests = project["services"]["ma"], project["services"]["tests"]
     assert f"{golden}:/data" in ma["volumes"]
     assert f"{app_vars}:/secrets/app_vars.json:ro" in ma["volumes"]
     assert ma["environment"] == {"MASS_APP_VARS_FILE": "/secrets/app_vars.json"}
     assert not any(volume.endswith(":/music:ro") for volume in ma["volumes"])
-    assert tests["command"][4:6] == ["-m", "tier2"]
+    assert tests["command"][4:6] == ["-m", "music"]
     assert tests["environment"]["LAB_ACCOUNT_SET"] == "spotify-a"
     assert project["services"]["potoken"] == {"image": "pot:latest"}
     run.dir.mkdir(parents=True)
@@ -148,26 +148,26 @@ def test_tier2_golden_and_app_vars(config: LabConfig, tmp_path: Path) -> None:
     assert runs.load(config, "r1").account_data == golden
 
 
-def test_tier2_tests_share_server_network(config: LabConfig, tmp_path: Path) -> None:
-    """Tier 2 scenarios reach the server's loopback; both tiers read the server's data dir."""
+def test_music_tests_share_server_network(config: LabConfig, tmp_path: Path) -> None:
+    """Music scenarios reach the server's loopback; every run reads the server's data dir."""
     app_vars = tmp_path / "app_vars.json"
     app_vars.write_text("{}")
     config = dataclasses.replace(config, app_vars_file=app_vars)
     golden = tmp_path / "data"
-    tier2 = runs.Run("r1", config.runs_dir / "r1", ("sendspin-1",), golden)
-    project = runs.render_compose(tier2, config, Path("/wt"), "img", "tok", TIER2)
+    music = runs.Run("r1", config.runs_dir / "r1", ("sendspin-1",), golden)
+    project = runs.render_compose(music, config, Path("/wt"), "img", "tok", MUSIC)
     tests = project["services"]["tests"]
     assert tests["network_mode"] == "service:ma"
     assert f"{golden}:/data:ro" in tests["volumes"]
-    tier1 = runs.Run("r2", config.runs_dir / "r2", ("sendspin-1",))
-    project = runs.render_compose(tier1, config, Path("/wt"), "img", "tok", TIER1)
+    fresh = runs.Run("r2", config.runs_dir / "r2", ("sendspin-1",))
+    project = runs.render_compose(fresh, config, Path("/wt"), "img", "tok", SMOKE)
     tests = project["services"]["tests"]
     assert "network_mode" not in tests
-    assert f"{tier1.data_dir}:/data:ro" in tests["volumes"]
+    assert f"{fresh.data_dir}:/data:ro" in tests["volumes"]
 
 
-def test_tier2_player_identities_per_set(config: LabConfig, tmp_path: Path) -> None:
-    """Tier 2 player identities follow the account set, not the run id."""
+def test_music_player_identities_per_set(config: LabConfig, tmp_path: Path) -> None:
+    """Music run player identities follow the account set, not the run id."""
     app_vars = tmp_path / "app_vars.json"
     app_vars.write_text("{}")
     config = dataclasses.replace(config, app_vars_file=app_vars)
@@ -180,7 +180,7 @@ def test_tier2_player_identities_per_set(config: LabConfig, tmp_path: Path) -> N
             Path("/wt"),
             "img",
             "tok",
-            TIER2,
+            MUSIC,
         )["services"]
         for run_id in ("r1", "r2")
     )
@@ -189,12 +189,12 @@ def test_tier2_player_identities_per_set(config: LabConfig, tmp_path: Path) -> N
         assert first[role]["command"] == second[role]["command"]
 
 
-def test_tier2_needs_app_vars_file(config: LabConfig, tmp_path: Path) -> None:
+def test_music_needs_app_vars_file(config: LabConfig, tmp_path: Path) -> None:
     """A missing app vars file fails before docker turns its path into a directory."""
     config = dataclasses.replace(config, app_vars_file=tmp_path / "missing.json")
     run = runs.Run("r1", config.runs_dir / "r1", ("sendspin-1",), tmp_path / "data")
     with pytest.raises(RuntimeError, match="app vars file"):
-        runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER2)
+        runs.render_compose(run, config, Path("/wt"), "img", "tok", MUSIC)
 
 
 def test_unknown_kind() -> None:
@@ -213,7 +213,7 @@ def test_junit_totals(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("selection", "args"),
     [
-        (runs.Selection("tier1"), ["/src/scenarios", "-p", "no:cacheprovider", "-m", "tier1"]),
+        (runs.Selection("smoke"), ["/src/scenarios", "-p", "no:cacheprovider", "-m", "smoke"]),
         (
             runs.Selection("gate", "smoke"),
             ["/src/scenarios", "-p", "no:cacheprovider", "-m", "gate", "-k", "smoke"],
@@ -235,13 +235,13 @@ def test_run_json_round_trip(config: LabConfig) -> None:
     run = runs.create(
         config, checkout, ("slim-1",), areas=("queue",), deep=True, purpose="gate dev queue"
     )
-    runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER1))
+    runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", SMOKE))
     loaded = runs.load(config, run.id)
     assert (loaded.areas, loaded.deep, loaded.purpose) == (("queue",), True, "gate dev queue")
 
 
-def test_tier1_mounts_docker_socket(config: LabConfig, tmp_path: Path) -> None:
-    """Every tier 1 run hands the tests container the docker socket and its compose project."""
+def test_fresh_run_mounts_docker_socket(config: LabConfig, tmp_path: Path) -> None:
+    """A run without an account set hands the tests container the docker socket and project."""
     tests = render(config, "slim")["tests"]
     assert "/var/run/docker.sock:/var/run/docker.sock" in tests["volumes"]  # type: ignore[operator]
     assert tests["environment"]["LAB_COMPOSE_PROJECT"] == "lab-r1"  # type: ignore[index]
@@ -249,17 +249,17 @@ def test_tier1_mounts_docker_socket(config: LabConfig, tmp_path: Path) -> None:
     app_vars.write_text("{}")
     config = dataclasses.replace(config, app_vars_file=app_vars)
     run = runs.Run("r1", config.runs_dir / "r1", ("slim-1",), tmp_path / "data")
-    tier2 = runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER2)["services"]["tests"]
-    assert not any("docker.sock" in volume for volume in tier2["volumes"])
-    assert "LAB_COMPOSE_PROJECT" not in tier2["environment"]
+    music = runs.render_compose(run, config, Path("/wt"), "img", "tok", MUSIC)["services"]["tests"]
+    assert not any("docker.sock" in volume for volume in music["volumes"])
+    assert "LAB_COMPOSE_PROJECT" not in music["environment"]
 
 
-def test_tier1_music_folders(config: LabConfig) -> None:
-    """Tier 1 mounts the tone library read-only and the run's writable folder below /music."""
+def test_fresh_run_music_folders(config: LabConfig) -> None:
+    """Without an account set the tone library and the run's writable folder are below /music."""
     checkout = Checkout("dev", "a" * 40, Path("/wt"), "img")
     run = runs.create(config, checkout, ("slim-1",))
     assert run.music_extra_dir.is_dir()
-    services = runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER1)["services"]
+    services = runs.render_compose(run, config, Path("/wt"), "img", "tok", SMOKE)["services"]
     assert services["ma"]["volumes"][-3:] == [
         "/music",
         f"{config.music_dir}:/music/tones:ro",
@@ -302,8 +302,8 @@ def test_rerun_outcomes() -> None:
     ]
 
 
-def test_tier1_radio(config: LabConfig, tmp_path: Path) -> None:
-    """Tier 1 runs the mock radio and points the scenarios at it; tier 2 has none."""
+def test_fresh_run_radio(config: LabConfig, tmp_path: Path) -> None:
+    """A run without an account set has the mock radio; a music run has none."""
     services = render(config, "sendspin")
     assert services["radio"]["image"] == runs.PLAYERS_IMAGE
     assert services["tests"]["environment"]["LAB_RADIO_URL"] == "http://radio:8000"  # type: ignore[index]
@@ -311,7 +311,7 @@ def test_tier1_radio(config: LabConfig, tmp_path: Path) -> None:
     app_vars.write_text("{}")
     config = dataclasses.replace(config, app_vars_file=app_vars)
     run = runs.Run("r1", config.runs_dir / "r1", ("sendspin-1",), tmp_path / "data")
-    services = runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER2)["services"]
+    services = runs.render_compose(run, config, Path("/wt"), "img", "tok", MUSIC)["services"]
     assert "radio" not in services
     assert "LAB_RADIO_URL" not in services["tests"]["environment"]
 
@@ -320,7 +320,7 @@ def test_hardware_profile(config: LabConfig) -> None:
     """A device run joins the shared macvlan network, publishes no port and lists its devices."""
     config = with_bench(config)
     run = runs.Run("r1", config.runs_dir / "r1", ("sendspin-1",), devices=("sonos-1",))
-    project = runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER1)
+    project = runs.render_compose(run, config, Path("/wt"), "img", "tok", SMOKE)
     assert project["networks"] == {"default": {"name": "lab-hw", "external": True}}
     assert "ports" not in project["services"]["ma"]
     env = project["services"]["tests"]["environment"]
@@ -344,5 +344,5 @@ def test_load_devices(config: LabConfig) -> None:
     config = with_bench(config)
     checkout = Checkout("dev", "a" * 40, Path("/wt"), "img")
     run = runs.create(config, checkout, ("sendspin-1",), devices=("sonos-1",))
-    runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", TIER1))
+    runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", SMOKE))
     assert runs.load(config, run.id).devices == ("sonos-1",)

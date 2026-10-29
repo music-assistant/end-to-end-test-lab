@@ -25,10 +25,10 @@ from scenarios.checks.context import CheckContext
 if TYPE_CHECKING:
     from scenarios.conftest import LabRun
 
-pytestmark = [pytest.mark.hw, pytest.mark.tier1, pytest.mark.timeout(300)]
+pytestmark = [pytest.mark.bench, pytest.mark.timeout(300)]
 
 needs_docker = pytest.mark.skipif(
-    PROJECT_ENV not in os.environ, reason="no docker engine access outside a tier 1 run"
+    PROJECT_ENV not in os.environ, reason="no docker engine access in this run"
 )
 
 

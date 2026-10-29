@@ -50,7 +50,7 @@ async def bootstrap(
     track_count: int | None,
     devices: dict[str, Device],
 ) -> None:
-    """Add player providers, wait for every role and device; tier 1 (`track_count`) adds tones."""
+    """Add player providers, wait for every role and device; `track_count` also adds the tones."""
     await wait_running(url)
     async with MusicAssistantClient(url, None, token=token) as client:
         # providers first, so discovery runs while the library syncs
@@ -70,7 +70,7 @@ async def _add_player_providers(
     """Set up the provider of every role kind and device in the run; MPD gets its hosts listed."""
     domains = {PROVIDER_DOMAINS[kind] for kind in map(role_kind, roles) if kind in PROVIDER_DOMAINS}
     domains |= {device.provider for device in devices.values()}
-    # a tier 2 golden keeps the providers earlier runs added
+    # an account set's golden keeps the providers earlier runs added
     existing = {
         conf["domain"]: conf["instance_id"]
         for conf in await client.send_command("config/providers")

@@ -1,4 +1,4 @@
-"""Hardware smoke test: every leased device plays a tone and goes idle on stop."""
+"""Bench play and stop: every leased device plays a tone and goes idle on stop."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from labctl.analyze import Manifest
     from scenarios.conftest import EventRecorder
 
-pytestmark = [pytest.mark.hw, pytest.mark.tier1, pytest.mark.timeout(300)]
+pytestmark = [pytest.mark.bench, pytest.mark.timeout(300)]
 
 TONE = "a1t4"
 # real devices buffer and start slower than the virtual players

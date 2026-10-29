@@ -15,7 +15,7 @@ from scenarios.helpers import until
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
 
-pytestmark = [pytest.mark.tier1, pytest.mark.timeout(120)]
+pytestmark = [pytest.mark.smoke, pytest.mark.timeout(120)]
 
 PLAYING_TIMEOUT_S = 10.0
 TONE_WITHIN_S = 10.0

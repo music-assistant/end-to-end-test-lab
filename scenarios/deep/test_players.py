@@ -33,7 +33,7 @@ GROUP_ROLES = ("slim-1", "snap-1", "sendspin-1")
 # the lab Sendspin client has no volume control
 VOLUME_ROLES = ("slim-1", "snap-1")
 needs_docker = pytest.mark.skipif(
-    PROJECT_ENV not in os.environ, reason="no docker engine access outside a tier 1 run"
+    PROJECT_ENV not in os.environ, reason="no docker engine access in this run"
 )
 
 

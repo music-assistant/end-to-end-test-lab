@@ -23,11 +23,11 @@ upstream = "https://github.com/music-assistant/server.git"
 nightly = "ghcr.io/music-assistant/server:nightly@sha256:REPLACE_ME"
 stable = "ghcr.io/music-assistant/server:stable"
 shairport = "mikebrady/shairport-sync:latest"
-# PO token server for the YT Music provider, a sidecar of login instances and tier 2 runs
+# PO token server for the YT Music provider, a sidecar of login instances and music runs
 potoken = "brainicism/bgutil-ytdlp-pot-provider:latest"
 
 [accounts]
-# Tier 2 account sets: name = path of the golden data dir on the VM. `lab accounts freeze <set>`
+# Account sets: name = path of the golden data dir on the VM. `lab accounts freeze <set>`
 # appends one line per set below these comments, for example:
 # spotify-a = "/srv/lab/accounts/spotify-a/data"
 

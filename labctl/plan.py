@@ -38,7 +38,7 @@ def plan(
 ) -> tuple[RunSpec, ...]:
     """Return the runs to start, in order; raise ValueError for flags that contradict each other.
 
-    `frozen_sets` are the account sets a deep run covers after its tier 1 run.
+    `frozen_sets` are the account sets a deep run covers after the virtual players.
     """
     _check(selected, bool(gate_areas), all_areas, deep, keep)
     listed = parse_roles(",".join(selected.kinds)) if selected.kinds else ()
@@ -56,10 +56,10 @@ def plan(
         marker = areas.gate_expression(gate_areas)
         specs.append(RunSpec("gate", purpose, roles, marker, gate_areas, rerun=True))
     elif selected.devices:
-        purpose = areas.purpose("hw", ref, ",".join(selected.devices), keep=keep)
-        # without virtual roles only the hw scenarios have a player to run on
-        marker = "tier1" if listed else "tier1 and hw"
-        specs.append(RunSpec("hw", purpose, listed, marker, devices=selected.devices))
+        purpose = areas.purpose("bench", ref, ",".join(selected.devices), keep=keep)
+        # without virtual roles only the bench scenarios have a player to run on
+        marker = "smoke or bench" if listed else "bench"
+        specs.append(RunSpec("bench", purpose, listed, marker, devices=selected.devices))
     elif selected.account_sets:
         # the listed players are the stage of the music runs below, not a gate of their own
         pass
@@ -70,12 +70,11 @@ def plan(
     else:
         roles = parse_roles(",".join(PLAYER_KINDS))
         purpose = areas.purpose("smoke", ref, keep=keep)
-        # hw scenarios carry the tier 1 marker too and need leased devices
-        specs.append(RunSpec("smoke", purpose, roles, "tier1 and not hw"))
+        specs.append(RunSpec("smoke", purpose, roles, "smoke"))
     stage = listed[:1] or ("sendspin-1",)
     for account_set in selected.account_sets:
         purpose = areas.purpose("music", ref, account_set, keep=keep)
-        specs.append(RunSpec("music", purpose, stage, "tier2", account_set=account_set))
+        specs.append(RunSpec("music", purpose, stage, "music", account_set=account_set))
     return tuple(specs)
 
 
@@ -92,7 +91,7 @@ def _check(selected: areas.Providers, gate: bool, all_areas: bool, deep: bool, k
     if keep and len(selected.account_sets) > 1:
         raise ValueError("--keep keeps one run, name one music provider")
     if gate and selected.devices:
-        raise ValueError("gates do not collect hw scenarios, run the devices without --areas")
+        raise ValueError("gates do not collect bench scenarios, run the devices without --areas")
     if selected.devices and any(kind != "sendspin" for kind in selected.kinds):
         # the other kinds are discovered over the network device runs share, so two runs
         # would see each other's players under the same names
@@ -102,7 +101,7 @@ def _check(selected: areas.Providers, gate: bool, all_areas: bool, deep: bool, k
 def _deep(
     ref: str, roles: tuple[str, ...], test_expr: str | None, frozen_sets: Iterable[str]
 ) -> tuple[RunSpec, ...]:
-    """Return the deep tier 1 run, then a tier 2 run per frozen account set on `sendspin-1`."""
+    """Return the deep run, then a music run per frozen account set on `sendspin-1`."""
     specs = [RunSpec("deep", areas.purpose("deep", ref), roles, "deep", deep=True)]
     # a -k expression names specific deep tests, so it skips the account sets
     if not test_expr:
@@ -111,7 +110,7 @@ def _deep(
                 "deep",
                 areas.purpose("deep", ref, name),
                 ("sendspin-1",),
-                "tier2",
+                "music",
                 account_set=name,
                 deep=True,
             )

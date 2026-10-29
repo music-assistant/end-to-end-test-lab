@@ -2,7 +2,7 @@
 
 ## What the lab is
 
-The lab runs a Music Assistant ref against a fresh server and virtual players (Sendspin, AirPlay, DLNA, Squeezelite, Snapcast, MPD) on a private Docker network, captures the audio each player received, and returns pytest's exit code, JUnit XML, the server log and the captures. It lives on a dedicated VM on an isolated network segment, so no lab player can reach a real speaker in the house. Tier 1 runs use a fresh data dir and a generated tone library, tier 2 runs use the logged-in data dir of an account set, and a small broker on the VM hands out leases so several agents can run at once.
+The lab runs a Music Assistant ref against a fresh server and virtual players (Sendspin, AirPlay, DLNA, Squeezelite, Snapcast, MPD) on a private Docker network, captures the audio each player received, and returns pytest's exit code, JUnit XML, the server log and the captures. It lives on a dedicated VM on an isolated network segment, so no lab player can reach a real speaker in the house. A run without a music provider gets a fresh data dir seeded from `golden/tier1` (the tone library); a music run mounts the account set's golden. A small broker on the VM hands out leases so several agents can run at once.
 
 `lab` is `bin/lab` on your machine: it rsyncs the repo to `/srv/lab/src` on the VM and runs `labctl` there over ssh. Put it on your PATH. Set `LAB_SSH_HOST` (default `lab`) or `LAB_SRC` (default `/srv/lab/src`) to point it elsewhere.
 
@@ -12,9 +12,9 @@ lab run --ref pr/7244 --providers sendspin,snapcast           # one PR, core plu
 lab run --ref pr/7244 --areas queue,streams                   # PR gate: core plus two areas, one rerun of failures
 lab run --ref pr/7244 --providers airplay                     # PR gate: core plus the AirPlay journey
 lab run --ref pr/7244 --all                                   # PR gate: every area and journey
-lab run --ref dev --providers spotify                         # tier 2 on the Spotify account set
-lab run --ref dev --deep                                      # daily deep run: tier 1 deep, then every account set
-lab run --ref dev --providers sonos-1 -k smoke                # real device on the bench, see Hardware
+lab run --ref dev --providers spotify                         # music run on the Spotify account set
+lab run --ref dev --deep                                      # daily deep run: virtual players, then every account set
+lab run --ref dev --providers sonos-1 -k play_stop            # real device on the bench, see Hardware
 lab runs                                                      # recent runs: purpose, exit code, rerun
 lab summary <run id>                                          # failures per area, checkpoint, rerun outcome
 lab status                                                    # leases and queue
@@ -44,7 +44,7 @@ lab run --ref <ref> [--providers <list>] [--areas <areas> | --all | --deep] [-k 
   - a music provider by its domain: `spotify`, `apple_music`, `tidal`, `ytmusic`, `qobuz`, `deezer`. It resolves to the frozen account set of that provider (`spotify` is `spotify-a`) and fails when there is none or more than one; a set name such as `spotify-a` works as well.
   - a bench device id from `[devices]` (`sonos-1`), or `devices` for every registered one; see Hardware.
 - `--areas` is a comma-separated list of gate areas (`AREA_ROLES` in `labctl/areas.py`: `core`, `queue`, `streams`, `players`, `library`).
-- `-k` is a pytest `-k` expression. It narrows whichever mode the other flags picked; the smoke test only runs when nothing is listed. Tier 1 has the smoke test, parametrized over every role; tier 2 has `continuity`, `external_pause`, `last_track_ends_clean` and `auth_restart`, see Account sets.
+- `-k` is a pytest `-k` expression. It narrows whichever mode the other flags picked; the smoke test only runs when nothing is listed. The smoke run has the smoke test, parametrized over every role; music runs have `continuity`, `external_pause`, `last_track_ends_clean` and `provider_reload`, see Account sets.
 - `--keep` leaves the run up instead of tearing it down and keeps its lease as a hold, see below.
 
 The flags pick what runs:
@@ -52,14 +52,14 @@ The flags pick what runs:
 - `--areas <a>,<b>`: a gate with `-m "gate and (area_core or area_<a> ...)"`, `core` always included. The roles are the union of the areas' roles, or the listed player providers plus `slim-1` for `core`, so `core` never skips.
 - Player providers without `--areas`, `--all` or `--deep`: a gate over `core` and each provider's journey, `-m "gate and (area_core or provider_<domain> ...)"`, on the listed players plus `slim-1` for `core`.
 - `--all`: a gate over everything, `-m gate`: every area and every journey, on every area's roles plus one player of each kind.
-- Music providers: one tier 2 run per account set (`-m tier2`), one after another, each under its own lease, on the first listed player provider or `sendspin-1`. No rerun.
-- Devices: one hardware run, see Hardware.
-- `--deep`: the daily deep run: one tier 1 run with `-m deep` on every deep role (`DEEP_ROLES`, two of slim, snap and sendspin) or the listed player providers, then one tier 2 run per frozen account set in name order, each on `sendspin-1` under its own lease. A tier 2 run that collects nothing (5) counts as 0.
-- Nothing of the above: a smoke run, `-m "tier1 and not hw"`, no rerun.
+- Music providers: one music run per account set (`-m music`), one after another, each under its own lease, on the first listed player provider or `sendspin-1`. No rerun.
+- Devices: one bench run, see Hardware.
+- `--deep`: the daily deep run: one run with `-m deep` on every deep role (`DEEP_ROLES`, two of slim, snap and sendspin) or the listed player providers, then one music run per frozen account set in name order, each on `sendspin-1` under its own lease. A music run that collects nothing (5) counts as 0.
+- Nothing of the above: a smoke run, `-m smoke`, no rerun.
 
 With a music provider in the list the players are only its stage: `--providers squeezelite,spotify` runs Spotify on `slim-1`, no squeezelite gate. `--areas`, `--all` and `--deep` exclude each other, `--deep` refuses `--keep`, `--deep` and `--all` take no music providers or devices, `--areas` takes no devices, and devices go only with `sendspin` players. Several runs exit with the worst exit code; each prints its own id.
 
-Every run has a purpose, which the lease, `run.json` and `summary.json` carry and `lab status` and `lab runs` show: `gate <ref> <areas> [<domains>]`, `all <ref>`, `deep <ref>` and `deep <ref> <set>` for its tier 2 runs, `music <ref> <set>`, `smoke <ref>` or `hw <ref> <ids>`, plus ` keep` with `--keep`. A gate's rerun has the same purpose.
+Every run has a purpose, which the lease, `run.json` and `summary.json` carry and `lab status` and `lab runs` show: `gate <ref> <areas> [<domains>]`, `all <ref>`, `deep <ref>` and `deep <ref> <set>` for its music runs, `music <ref> <set>`, `smoke <ref>` or `bench <ref> <ids>`, plus ` keep` with `--keep`. A gate's rerun has the same purpose.
 
 Which areas a PR needs is in [README.md](../README.md#which-areas-for-my-diff).
 
@@ -69,7 +69,7 @@ The CLI prints the run id and sha, how long bootstrap took, and a closing line w
 
 Ctrl-C tears the run down (unless `--keep`) and then releases the lease.
 
-Gate rerun. When a gate run exits 1 and wrote `junit.xml` (test failures, not 2 to 5, a failure before pytest or a pytest that died), `lab run` reruns the failed and errored tests once, by node id with the same marker, as a new run in a fresh compose project under the same lease and checkout. The command's exit code is the rerun's, so the gate is red only when a test fails twice. The first run's `summary.json` gets `rerun_run_id` and `reruns` (`[{"test": <node id>, "first": "fail", "second": "pass"|"fail"}]`); the rerun's `junit.xml`, captures and `ma.log` live in its own run dir. `--keep` skips the rerun and keeps the failed run up. Smoke, music, hardware and `--deep` runs never rerun.
+Gate rerun. When a gate run exits 1 and wrote `junit.xml` (test failures, not 2 to 5, a failure before pytest or a pytest that died), `lab run` reruns the failed and errored tests once, by node id with the same marker, as a new run in a fresh compose project under the same lease and checkout. The command's exit code is the rerun's, so the gate is red only when a test fails twice. The first run's `summary.json` gets `rerun_run_id` and `reruns` (`[{"test": <node id>, "first": "fail", "second": "pass"|"fail"}]`); the rerun's `junit.xml`, captures and `ma.log` live in its own run dir. `--keep` skips the rerun and keeps the failed run up. Smoke, music, bench and `--deep` runs never rerun.
 
 Flake ledger. Every gate rerun appends one line per rerun test to `/srv/lab/flakes.jsonl` (date, run id, ref, node id, role, check, first and second outcome, and `first_checkpoint` and `second_checkpoint`: the failed or else last checkpoint of each run, `-` when that run passed or recorded none). `lab flakes [--days n]` (default 30) prints one line per check, most rerun first: `<check>  reruns <n>  passed on rerun <k>  roles <roles>`. `lab flakes --list` prints the entries themselves, newest first: `<date>  <run id>  <ref>  <node id>  fail (<checkpoint>) -> pass (-)`. Lines written before the checkpoints were recorded show `-`.
 
@@ -95,8 +95,8 @@ captures/         <role>.pcm, .stamps and .json per role: the audio received, pe
 compose.yml       the rendered compose project, named lab-<run id>
 run.json          ref, sha (so gc keeps the worktree), purpose, areas, deep and devices; written first, before any slow step. Kept runs add the hold id
 src/              copy of what the run mounts from the lab repo (labctl, scenarios, pyproject.toml, tone manifest, mpd and shairport configs)
-data/             the server data dir (tier 1 only; tier 2 uses the account set's data dir), read-only at /data in the tests container
-music-extra/      tier 1 only: writable music folder, /music/extra in the server (the tone library is /music/tones) and /run/music-extra in the tests container
+data/             the server data dir (not in music runs, which use the account set's data dir), read-only at /data in the tests container
+music-extra/      not in music runs: writable music folder, /music/extra in the server (the tone library is /music/tones) and /run/music-extra in the tests container
 ```
 
 Reading a failed run:
@@ -146,7 +146,7 @@ Timings, warm (images, worktree, golden and uv cache present), wall clock from t
 
 ## Leases
 
-A run takes one capacity slot, plus `account:<set>` for tier 2 and `device:<id>` per leased device. Capacity is `[broker] capacity` in `lab.toml` (2 in the example), so by default two runs go at once and a third queues. Waiters are served first in, first out, but a waiter blocked on a busy account does not hold up a later waiter whose resources are free. A `lab run` that has to wait prints `queued at position N` on stderr.
+A run takes one capacity slot, plus `account:<set>` for a music run and `device:<id>` per leased device. Capacity is `[broker] capacity` in `lab.toml` (2 in the example), so by default two runs go at once and a third queues. Waiters are served first in, first out, but a waiter blocked on a busy account does not hold up a later waiter whose resources are free. A `lab run` that has to wait prints `queued at position N` on stderr.
 
 ```
 lab status
@@ -162,13 +162,13 @@ labd keeps its state in `/srv/lab/state.json`, rewritten after every change, and
 ## Account sets
 
 An account set is a Music Assistant data dir with streaming providers logged in (for example
-`spotify-a`, `apple-a`). Tier 2 runs boot it in place, one run per set at a time: every set is an
+`spotify-a`, `apple-a`). Music runs boot it in place, one run per set at a time: every set is an
 exclusive lease `account:<set>` next to the run slot. Everything lives in `/srv/lab/accounts/<set>/`:
 `data/` (the golden data dir), `password` (UI login), `token` (API token for runs).
 
 The server reads the Spotify, Apple Music and Tidal client ids from the app vars file
 (`[secrets] app_vars_file` in `lab.toml`, `/srv/lab/secrets/app_vars.json`, copied from the
-`appvars` repo). Login instances and tier 2 runs refuse to start without it.
+`appvars` repo). Login instances and music runs refuse to start without it.
 
 ### Log in
 
@@ -193,9 +193,9 @@ Spotify with the Soloist backend pairs from the Spotify app on a phone, which mu
 server over mDNS. A container on a private bridge is invisible to it, so start that set with
 `lab accounts init spotify-a --host-network`: the server then shares the VM's network (web and
 stream ports picked free on every interface) and the phone joins the `MA Lab` Wi-Fi (VLAN 50).
-Autoplay must be OFF on the Spotify account, see Tier 2 scenarios.
+Autoplay must be OFF on the Spotify account, see Music scenarios.
 
-YT Music needs a PO token server. Login instances (except host-network ones) and tier 2 runs start
+YT Music needs a PO token server. Login instances (except host-network ones) and music runs start
 a `potoken` sidecar (`[images] potoken`, bgutil-ytdlp-pot-provider); enter `http://potoken:4416`
 as the PO token server URL in the YT Music setup flow so the golden keeps a URL every run resolves.
 
@@ -219,16 +219,16 @@ lab run --ref dev --providers spotify [-k expr] [--keep]
 
 holds a run slot plus `account:spotify-a`, mounts the set's `data/` at `/data` without copying
 (whatever the run changes stays in the golden: player providers, players, library; player identities are fixed per set and role, so the players are reused across runs), passes the app
-vars file, and runs `pytest -m tier2`. Bootstrap only adds the player providers of the requested
+vars file, and runs `pytest -m music`. Bootstrap only adds the player providers of the requested
 roles; the account's providers come with the golden. Runs have internet through the bridge NAT
 and no route to the house LAN.
 
-In tier 2 the tests container shares the server's network namespace (`network_mode: service:ma`)
-and mounts the set's data dir read-only at `/data`: scenarios read the live server log
-(`/data/musicassistant.log`) and reach the Soloist engine's WebSocket, which listens on the
-server's loopback and publishes its port in `/data/spotify/<instance>/soloist-data/ws.port`.
+In a music run the tests container shares the server's network namespace
+(`network_mode: service:ma`) and mounts the set's data dir read-only at `/data`: scenarios read the
+live server log (`/data/musicassistant.log`) and reach the Soloist engine's WebSocket, which listens
+on the server's loopback and publishes its port in `/data/spotify/<instance>/soloist-data/ws.port`.
 
-### Tier 2 scenarios
+### Music scenarios
 
 - `continuity` (every set): two tracks of 1 to 4 minutes (the first two library tracks by name,
   else the first two hits of a `The Beatles` search), seek item 1 to 20 s before its end, then the
@@ -244,11 +244,11 @@ server's loopback and publishes its port in `/data/spotify/<instance>/soloist-da
   end. The queue must go idle without a `paused` queue or player state, the capture must have no
   silence over 1 s until 3 s before the end and no sound from 5 s after it (a replay), and the
   server log no ERROR line since the play (#6860, #6667, #6222).
-- `auth_restart` (every set, once): reloads every non-builtin music provider, which must be
+- `provider_reload` (every set, once): reloads every non-builtin music provider, which must be
   available again within 60 s and return `The Beatles` tracks from its own domain (#6119). A
   server restart would cut the tests container's network, which it shares with the server.
 
-Tier 2 tests carry no area marker: their `area` property is `music_<provider>` of the account
+Music tests carry no area marker: their `area` property is `music_<provider>` of the account
 set (`ACCOUNT_SET_PROVIDERS` in `labctl/areas.py`), passed as `LAB_ACCOUNT_SET`.
 
 The tracks used, the boundary gap and the stop latency are JUnit testsuite properties in
@@ -279,7 +279,7 @@ stops the set's login instance if one runs, deletes `/srv/lab/accounts/<set>`, d
 A role is `<kind>-<n>`, and Music Assistant must show it as an available player named `lab-<role>`. Bootstrap (`_wait_players`) and the `players` test fixture both find a role by that name, so a role that registers under another name fails the run. Verified flags for the existing roles are in [players.md](players.md); do not repeat them here.
 
 1. Add the kind to `PLAYER_KINDS` in `labctl/config.py` and its provider domain to `PLAYER_DOMAINS` in `labctl/areas.py`. The domain becomes a valid `--providers` value and the kind part of the default list. Give it a journey in `scenarios/gate/test_player_kind.py` with a `provider_<domain>` marker, registered in `pyproject.toml`.
-2. Add its compose service to `_player_service` in `labctl/runs.py`: image, command, mounts. The command must write 48 kHz 16-bit stereo PCM to `/fifo/pcm`, take the name `lab-<role>` from the player's own flag or hostname, and use an identifier seeded by `run.identity_scope` and the role (see the uuid5 for DLNA and the MAC for Squeezelite): unique per run in tier 1, stable per account set in tier 2 so the golden does not collect a player config per run. `render_compose` then adds the rest: a `<role>-pacer` sidecar that creates the FIFO and stamps what the player writes, a per-role FIFO volume, and a `depends_on` on the healthy pacer so compose stops the player first. If the player writes faster than real time, add the kind to `UNPACED_KINDS` so its pacer drains at the PCM rate. A player that writes its own capture, like Sendspin, gets its own branch in `render_compose` instead.
+2. Add its compose service to `_player_service` in `labctl/runs.py`: image, command, mounts. The command must write 48 kHz 16-bit stereo PCM to `/fifo/pcm`, take the name `lab-<role>` from the player's own flag or hostname, and use an identifier seeded by `run.identity_scope` and the role (see the uuid5 for DLNA and the MAC for Squeezelite): unique per run, stable per account set in a music run so the golden does not collect a player config per run. `render_compose` then adds the rest: a `<role>-pacer` sidecar that creates the FIFO and stamps what the player writes, a per-role FIFO volume, and a `depends_on` on the healthy pacer so compose stops the player first. If the player writes faster than real time, add the kind to `UNPACED_KINDS` so its pacer drains at the PCM rate. A player that writes its own capture, like Sendspin, gets its own branch in `render_compose` instead.
 3. Teach `labctl/bootstrap.py` about the provider: add `<kind>: <provider domain>` to `PROVIDER_DOMAINS` when the provider needs no setup values. Anything more, such as MPD's manual host list or a rename to `lab-<role>`, goes in `_add_player_providers` or a step of its own next to `_name_mpd_players`. Bootstrap already sets players with volume control to 100, because several providers start low enough to put the tone under the analyzer's silence floor.
 4. Rebuild the players image when the role needs a new binary (add the package to `images/players/Dockerfile`) and after any change to the pacer, the MPD pipe copier or the Sendspin client, which the image installs as a copy and does not reload.
 
@@ -315,10 +315,10 @@ lab hw status    # checks the shim link is up and the network has the configured
 What a device run changes:
 
 - The whole compose project joins the shared macvlan network `lab-hw` (external, so `docker compose down` leaves it). Several runs share that network, and Docker's DNS would answer a plain service name such as `ma` with any run's container, so every service also answers to `<project>-<service>` (`lab-<run id>-ma`) and the run's own containers use those names (`LAB_MA_URL`, Sendspin's `--server`, `LAB_RADIO_URL`).
-- Virtual player providers other than `sendspin` are refused: AirPlay, DLNA and the others are discovered over the network, and two device runs would see each other's `lab-<role>` players. A music provider next to devices gets its own run after the device run, without the devices: the `hw` scenarios are tier 1, and bootstrap would otherwise write a device provider into the frozen account set.
+- Virtual player providers other than `sendspin` are refused: AirPlay, DLNA and the others are discovered over the network, and two device runs would see each other's `lab-<role>` players. A music provider next to devices gets its own run after the device run, without the devices: the bench scenarios run on a fresh data dir, and bootstrap would otherwise write a device provider into the frozen account set.
 - The server publishes no port. The VM reaches it at its container address (`docker inspect` of the `ma` container), and the server discovers the devices on the LAN.
-- The tests container gets `LAB_DEVICES` (registry entries of the leased devices) and pytest runs `-m "tier1 and hw"`, or `-m tier1` when `sendspin` players are listed too, so the `hw` scenarios run: the smoke test in `scenarios/hw/test_smoke.py` (playing after play, idle after stop, on every leased device), the bench journeys and the state checks of [players.md](players.md#bench-devices). The state checks include one server restart, so a device run takes about 19 min for five devices.
-- Each device adds a `device:<id>` lease. Gates and `--deep` do not collect `hw` scenarios, so `--areas`, `--all` and `--deep` refuse devices.
+- The tests container gets `LAB_DEVICES` (registry entries of the leased devices) and pytest runs `-m bench`, or `-m "smoke or bench"` when `sendspin` players are listed too: the play and stop test in `scenarios/bench/test_play_stop.py` (playing after play, idle after stop, on every leased device), the bench journeys and the state checks of [players.md](players.md#bench-devices). The state checks include one server restart, so a device run takes about 19 min for five devices.
+- Each device adds a `device:<id>` lease. Gates and `--deep` do not collect `bench` scenarios, so `--areas`, `--all` and `--deep` refuse devices.
 
 Without `sendspin` in `--providers` the device run has no virtual roles.
 
@@ -345,7 +345,7 @@ lab run --ref dev
 
 labd does not read `[images]`, so it needs no restart. Update the digest when a ref fails at server start with `this ref needs a newer base image` (its PyAV pin is newer than the one in the base image). The stable image follows the `stable` tag and every run pulls it.
 
-Tier 1 golden. `golden/tier1/` is built once, on the first tier 1 run, and is not rebuilt automatically. If a server change makes it stale, delete the directory and the next tier 1 run builds it again.
+Fresh data dir golden. `golden/tier1/` is built once, on the first run without a music provider, and is not rebuilt automatically. If a server change makes it stale, delete the directory and the next such run builds it again.
 
 Known limitations:
 

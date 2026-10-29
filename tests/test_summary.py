@@ -19,7 +19,7 @@ JUNIT = """<?xml version="1.0" encoding="utf-8"?>
 </properties><error/></testcase>
 <testcase classname="scenarios.gate.test_queue" name="test_queue[snap-1]">
 <properties><property name="area" value="queue"/></properties></testcase>
-<testcase classname="scenarios.tier1.test_smoke" name="test_smoke[slim-1]"><skipped/></testcase>
+<testcase classname="scenarios.smoke.test_smoke" name="test_smoke[slim-1]"><skipped/></testcase>
 </testsuite></testsuites>
 """
 

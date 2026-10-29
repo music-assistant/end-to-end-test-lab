@@ -42,7 +42,7 @@ def cli(ctx: click.Context) -> None:
 )
 @click.option("--areas", "area_csv", help="Comma-separated gate areas; core always runs.")
 @click.option("--all", "all_areas", is_flag=True, help="Gate over every area and player journey.")
-@click.option("--deep", is_flag=True, help="Daily deep run: tier 1 deep, then every account set.")
+@click.option("--deep", is_flag=True, help="Daily deep run: virtual players, then account sets.")
 @click.option("-k", "test_expr", help="pytest -k expression.")
 @click.option("--keep", is_flag=True, help="Leave the run up; `lab release <run id>` ends it.")
 @click.pass_obj
@@ -56,7 +56,7 @@ def run(
     test_expr: str | None,
     keep: bool,
 ) -> None:
-    """Run scenarios on a ref: a gate, a smoke, music, hardware or the deep run, see the runbook."""
+    """Run scenarios on a ref: a gate, a smoke, music, bench or the deep run, see the runbook."""
     selected = _parse_providers(config, provider_csv) if provider_csv else areas.Providers()
     gate_areas = _parse_areas(area_csv) if area_csv is not None else ()
     try:
@@ -186,7 +186,7 @@ def gc(config: LabConfig, days: int) -> None:
 
 @cli.group("accounts")
 def accounts_group() -> None:
-    """Tier 2 account sets: log in once on a login instance, then freeze the data dir."""
+    """Account sets for music runs: log in once on a login instance, then freeze the data dir."""
 
 
 @accounts_group.command("init")
@@ -305,7 +305,7 @@ def _run_all(
     worst = 0
     for spec in specs:
         exit_code = _one_run(config, ref, spec, test_expr, keep)
-        # a set whose providers no tier 2 scenario covers collects nothing
+        # a set whose providers no music scenario covers collects nothing
         if spec.deep and spec.account_set is not None and exit_code == NO_TESTS_COLLECTED:
             exit_code = 0
         worst = max(worst, exit_code)

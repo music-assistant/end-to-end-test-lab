@@ -67,12 +67,12 @@ class LabConfig:
 
     @property
     def golden_dir(self) -> Path:
-        """Seed data dirs copied into fresh tier 1 runs."""
+        """Seed data dirs copied into every run without an account set."""
         return self.root / "golden"
 
     @property
     def accounts_dir(self) -> Path:
-        """One directory per tier 2 account set: golden data dir, token, login instance."""
+        """One directory per account set: golden data dir, token, login instance."""
         return self.root / "accounts"
 
     @property

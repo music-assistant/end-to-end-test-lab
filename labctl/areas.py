@@ -33,7 +33,7 @@ ACCOUNT_SET_PROVIDERS = {
     "qobuz": "qobuz",
     "deezer": "deezer",
 }
-# tier 2 areas, one per frozen account provider; selected by --providers, never by --areas
+# music areas, one per frozen account provider; selected by --providers, never by --areas
 MUSIC_AREAS = tuple(ACCOUNT_SET_PROVIDERS.values())
 # every role a deep run boots: the deep matrices want two of slim, snap and sendspin
 DEEP_ROLES = (
@@ -98,7 +98,7 @@ def account_set_provider(account_set: str) -> str:
 
 
 def account_set_area(account_set: str) -> str:
-    """Return the tier 2 area of an account set, `music_apple_music` for `apple-a`."""
+    """Return the music area of an account set, `music_apple_music` for `apple-a`."""
     return f"music_{account_set_provider(account_set)}"
 
 

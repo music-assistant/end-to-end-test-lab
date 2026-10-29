@@ -1,7 +1,7 @@
 """Music providers come back logged in after a reload and still find tracks (#6119).
 
-A server restart would also take down the tests container's network, which tier 2 shares with
-the server, so this reloads every music provider instead. That covers the stored credentials
+A server restart would also take down the tests container's network, which music runs share
+with the server, so this reloads every music provider instead. That covers the stored credentials
 and token refresh of a provider start, not the server's own startup.
 """
 
@@ -17,7 +17,7 @@ import pytest
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
 
-pytestmark = [pytest.mark.tier2, pytest.mark.timeout(180)]
+pytestmark = [pytest.mark.music, pytest.mark.timeout(180)]
 
 AVAILABLE_TIMEOUT_S = 60.0
 SEARCH_QUERY = "The Beatles"
@@ -25,7 +25,7 @@ SEARCH_LIMIT = 5
 POLL_S = 1.0
 
 
-async def test_auth_restart(
+async def test_provider_reload(
     client: MusicAssistantClient, record_testsuite_property: Callable[[str, object], None]
 ) -> None:
     """Every streaming provider reloads, is available within 60 s and returns search results."""

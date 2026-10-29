@@ -28,7 +28,7 @@ async def boot_clean(ctx: CheckContext) -> None:
         assert not missing, f"roles without an available player: {missing}"
 
     with ctx.step("no_errors_logged", BOOT_ISSUES):
-        # a tier 1 data dir is fresh, so the whole log is this boot
+        # without an account set the data dir is fresh, so the whole log is this boot
         errors = ma_log_errors(0)
         assert not errors, f"{len(errors)} error lines logged:\n" + "\n".join(
             errors[:MAX_LOGGED_LINES]

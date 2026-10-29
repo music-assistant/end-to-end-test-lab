@@ -7,7 +7,7 @@ import os
 import aiohttp
 
 DOCKER_SOCKET = "/var/run/docker.sock"
-# set on the tests container of a tier 1 run only, together with the socket mount
+# set on the tests container of a run without an account set only, together with the socket mount
 PROJECT_ENV = "LAB_COMPOSE_PROJECT"
 # a stop waits out the container's grace period before docker answers
 DOCKER_TIMEOUT_S = 60.0

@@ -208,7 +208,7 @@ def record_area(
 ) -> None:
     """Record the area of every `area_<name>` and `provider_<domain>` marker.
 
-    A `provider_<domain>` marker records the domain; a tier 2 test records its account set area.
+    A `provider_<domain>` marker records the domain; a music test records its account set area.
     """
     areas = [
         marker.name.removeprefix("area_").removeprefix("provider_")

@@ -64,10 +64,10 @@ def test_all() -> None:
 
 
 def test_music_alone() -> None:
-    """One tier 2 run per set on sendspin-1, no rerun."""
+    """One music run per set on sendspin-1, no rerun."""
     assert specs(Providers(account_sets=SETS)) == (
-        RunSpec("music", "music dev spotify-a", ("sendspin-1",), "tier2", account_set="spotify-a"),
-        RunSpec("music", "music dev tidal-a", ("sendspin-1",), "tier2", account_set="tidal-a"),
+        RunSpec("music", "music dev spotify-a", ("sendspin-1",), "music", account_set="spotify-a"),
+        RunSpec("music", "music dev tidal-a", ("sendspin-1",), "music", account_set="tidal-a"),
     )
 
 
@@ -78,16 +78,16 @@ def test_music_on_player_stage() -> None:
 
 
 def test_devices() -> None:
-    """Devices alone run only the hw scenarios."""
+    """Devices alone run only the bench scenarios."""
     assert specs(Providers(devices=("sonos-1",))) == (
-        RunSpec("hw", "hw dev sonos-1", (), "tier1 and hw", devices=("sonos-1",)),
+        RunSpec("bench", "bench dev sonos-1", (), "bench", devices=("sonos-1",)),
     )
 
 
 def test_devices_with_sendspin() -> None:
-    """Sendspin players join the device run, which then runs all of tier 1."""
+    """Sendspin players join the device run, which then runs the smoke test too."""
     [spec] = specs(Providers(kinds=("sendspin",), devices=("sonos-1",)))
-    assert (spec.roles, spec.marker) == (("sendspin-1",), "tier1")
+    assert (spec.roles, spec.marker) == (("sendspin-1",), "smoke or bench")
 
 
 def test_deep() -> None:
@@ -95,7 +95,7 @@ def test_deep() -> None:
     deep, spotify, tidal = specs(deep=True)
     assert (deep.purpose, deep.marker, deep.deep, len(deep.roles)) == ("deep dev", "deep", True, 9)
     assert spotify == RunSpec(
-        "deep", "deep dev spotify-a", ("sendspin-1",), "tier2", account_set="spotify-a", deep=True
+        "deep", "deep dev spotify-a", ("sendspin-1",), "music", account_set="spotify-a", deep=True
     )
     assert tidal.account_set == "tidal-a"
 
@@ -113,7 +113,7 @@ def test_deep_with_k_skips_sets() -> None:
 
 def test_nothing_listed() -> None:
     """The smoke run on one player of each kind."""
-    assert specs() == (RunSpec("smoke", "smoke dev", ALL_KINDS, "tier1 and not hw"),)
+    assert specs() == (RunSpec("smoke", "smoke dev", ALL_KINDS, "smoke"),)
 
 
 @pytest.mark.parametrize(
@@ -125,7 +125,7 @@ def test_nothing_listed() -> None:
         ({"selected": Providers(account_sets=("spotify-a",)), "deep": True}, "player providers"),
         ({"selected": Providers(kinds=("airplay",)), "all_areas": True}, "drop --providers"),
         ({"selected": Providers(account_sets=SETS), "keep": True}, "one music provider"),
-        ({"selected": Providers(devices=("sonos-1",)), "gate_areas": ("queue",)}, "hw scenarios"),
+        ({"selected": Providers(devices=("sonos-1",)), "gate_areas": ("queue",)}, "bench"),
         ({"selected": Providers(kinds=("airplay",), devices=("sonos-1",))}, "sendspin players"),
     ],
 )
