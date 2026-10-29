@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import pytest
+from music_assistant_models.enums import MediaType, SortField
 
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
@@ -36,8 +37,6 @@ ENGINE_COMMAND_TIMEOUT_S = 5.0
 
 async def pick_tracks(client: MusicAssistantClient, count: int) -> list[Track]:
     """Return `count` available tracks of 1 to 4 minutes, library first (by name), else search."""
-    from music_assistant_models.enums import MediaType, SortField
-
     library = await client.music.get_library_tracks(limit=LIBRARY_LIMIT, sort_field=SortField.NAME)
     picked = _fitting(library, count)
     if len(picked) < count:

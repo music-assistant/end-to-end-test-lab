@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import PlaybackState
 
 from labctl.analyze import Capture, Manifest
 from scenarios.helpers import until
@@ -35,8 +36,6 @@ async def test_smoke(
     capture: Callable[[str], Capture],
 ) -> None:
     """Tone track A reaches the player's capture after play and stops after stop."""
-    from music_assistant_models.enums import PlaybackState
-
     player_id = players[role]
     tone = tones.tracks[0]
     [track] = await client.music.get_library_tracks(search=tone.title, limit=1)

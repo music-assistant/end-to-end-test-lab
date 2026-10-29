@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_client import MusicAssistantClient
 
 from labctl.analyze import Capture, Manifest
 from labctl.areas import account_set_area
@@ -19,8 +20,6 @@ from labctl.devices import Device, from_env, matches
 from scenarios.checks.context import CaptureLoader, CheckContext
 
 if TYPE_CHECKING:
-    # the client library only exists in the tests container
-    from music_assistant_client import MusicAssistantClient
     from music_assistant_models.enums import EventType
     from music_assistant_models.event import MassEvent
 
@@ -237,8 +236,6 @@ def lab_run() -> LabRun:
 @contextlib.asynccontextmanager
 async def connect(run: LabRun, events: EventRecorder) -> AsyncIterator[MusicAssistantClient]:
     """Connect a listening client that records into `events`, with the server state loaded."""
-    from music_assistant_client import MusicAssistantClient
-
     ma = MusicAssistantClient(run.ma_url, None, token=run.token)
     ma.subscribe(events.record)
     ready = asyncio.Event()

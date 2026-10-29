@@ -9,6 +9,8 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from music_assistant_models.enums import EventType, PlaybackState, PlayerFeature, QueueOption
+
 from labctl.devices import DEVICE_VOLUME, Device, matches
 from scenarios.checks.containers import restart_role
 from scenarios.checks.library import RESTART_TIMEOUT_S, SERVER_SERVICE
@@ -26,7 +28,6 @@ from scenarios.checks.streams import ICY_PATH, radio_url
 from scenarios.helpers import queue_field, queue_playing, until
 
 if TYPE_CHECKING:
-    from music_assistant_models.enums import PlayerFeature
     from music_assistant_models.player import Player
 
     from scenarios.checks.context import CheckContext
@@ -92,8 +93,6 @@ REDISCOVER_TIMEOUT_S = 90.0
 
 async def bench_album(ctx: CheckContext, device: str) -> None:
     """Check the 10 s album advances through all three tracks and ends without overrunning."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     reported_names: list[str | None] = []
     try:
@@ -130,8 +129,6 @@ async def bench_album(ctx: CheckContext, device: str) -> None:
 
 async def bench_pause_resume(ctx: CheckContext, device: str) -> None:
     """Check a pause holds its state for 15 s and resume plays on from the paused position."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     try:
         await _play(ctx, queue_id, (LONG_TONE,), PAUSE_ISSUES)
@@ -177,8 +174,6 @@ async def bench_pause_resume(ctx: CheckContext, device: str) -> None:
 
 async def bench_long_pause(ctx: CheckContext, device: str) -> None:
     """Check the server stops a pause after 30 s and resume plays on from the paused position."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     try:
         await _play(ctx, queue_id, (LONG_TONE,), LONG_PAUSE_ISSUES)
@@ -234,8 +229,6 @@ async def bench_long_pause(ctx: CheckContext, device: str) -> None:
 
 async def bench_seek(ctx: CheckContext, device: str) -> None:
     """Check a seek to 40 s reports the new position and the track then plays to its end."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     try:
         await _play(ctx, queue_id, (LONG_TONE,), SEEK_ISSUES)
@@ -274,8 +267,6 @@ async def bench_seek(ctx: CheckContext, device: str) -> None:
 
 async def bench_stop_position(ctx: CheckContext, device: str) -> None:
     """Check a track that played to its end never reports a position past it and replays from 0."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     tone = ALBUM[0]
     track_s = duration(ctx, tone)
@@ -309,8 +300,6 @@ async def bench_stop_position(ctx: CheckContext, device: str) -> None:
 
 async def bench_next_skips_one(ctx: CheckContext, device: str) -> None:
     """Check next moves exactly one track ahead."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     try:
         await _play(ctx, queue_id, ALBUM, NEXT_ISSUES)
@@ -362,8 +351,6 @@ async def bench_group_skip(ctx: CheckContext, device: str, second: str) -> None:
 
 async def bench_volume_reported(ctx: CheckContext, device: str) -> None:
     """Check the device reports a volume set while it plays, up to 3 and back to 1."""
-    from music_assistant_models.enums import PlayerFeature
-
     queue_id = ctx.player_id(device)
     if not _recorded_support(ctx, queue_id, "volume_checked", PlayerFeature.VOLUME_SET):
         return
@@ -380,8 +367,6 @@ async def bench_volume_reported(ctx: CheckContext, device: str) -> None:
 
 async def bench_mute(ctx: CheckContext, device: str) -> None:
     """Check mute and unmute are reported while the device plays and unmute keeps the level."""
-    from music_assistant_models.enums import PlayerFeature
-
     queue_id = ctx.player_id(device)
     features = (PlayerFeature.VOLUME_SET, PlayerFeature.VOLUME_MUTE)
     if not _recorded_support(ctx, queue_id, "mute_checked", *features):
@@ -411,8 +396,6 @@ async def bench_mute(ctx: CheckContext, device: str) -> None:
 
 async def bench_volume_kept(ctx: CheckContext, device: str) -> None:
     """Check the device keeps volume 3 through play, pause, resume and next."""
-    from music_assistant_models.enums import PlayerFeature
-
     queue_id = ctx.player_id(device)
     if not _recorded_support(ctx, queue_id, "volume_checked", PlayerFeature.VOLUME_SET):
         return
@@ -438,8 +421,6 @@ async def bench_volume_kept(ctx: CheckContext, device: str) -> None:
 
 async def bench_stop_then_play(ctx: CheckContext, device: str) -> None:
     """Check stop mid-track goes idle within 10 s and the next play starts from the beginning."""
-    from music_assistant_models.enums import EventType
-
     queue_id = ctx.player_id(device)
     try:
         await _play(ctx, queue_id, (LONG_TONE,), STOP_PLAY_ISSUES)
@@ -484,8 +465,6 @@ async def bench_radio_starts(ctx: CheckContext, device: str) -> None:
 
 async def bench_group_state(ctx: CheckContext, device: str, second: str) -> None:
     """Check a group of two devices plays on both, survives next and ungroup leaves the leader."""
-    from music_assistant_models.enums import PlaybackState
-
     leader = ctx.player_id(device)
     with ctx.step("second_available", GROUP_STATE_ISSUES):
         assert second in ctx.players, f"{second} was not available when the run resolved players"
@@ -560,8 +539,6 @@ async def _play(
     step: str = "starts",
 ) -> float:
     """Replace the queue with the tones and wait in step `step` until it plays index 0."""
-    from music_assistant_models.enums import QueueOption
-
     media = await tracks(ctx, tone_ids)
     started = time.time()
     with ctx.step(step, issues):
@@ -574,8 +551,6 @@ async def _wait_playing(
     ctx: CheckContext, queue_id: str, index: int, timeout: float, since: float | None = None
 ) -> None:
     """Wait for a QUEUE_UPDATED event of the queue playing `index`."""
-    from music_assistant_models.enums import EventType
-
     await ctx.events.wait_for(
         EventType.QUEUE_UPDATED, queue_playing(queue_id, index), timeout, since
     )
@@ -605,8 +580,6 @@ async def _set_volume(ctx: CheckContext, player_id: str, level: int) -> None:
 
 async def _restore_volume(ctx: CheckContext, player_id: str) -> None:
     """Unmute the device and set it back to the bootstrap volume, as far as it has the controls."""
-    from music_assistant_models.enums import PlayerFeature
-
     player = _player(ctx, player_id)
     if PlayerFeature.VOLUME_MUTE in player.supported_features:
         await ctx.client.players.volume_mute(player_id, False)
@@ -680,7 +653,6 @@ def _player(ctx: CheckContext, player_id: str) -> Player:
 
 def _all_playing(ctx: CheckContext, *player_ids: str) -> Callable[[], bool]:
     """Condition that every one of the players reports playing, for `until`."""
-    from music_assistant_models.enums import PlaybackState
 
     def playing() -> bool:
         return all(
@@ -728,8 +700,6 @@ def _reported_positions(
     ctx: CheckContext, queue_id: str, since: float, name: str
 ) -> tuple[float, int]:
     """Highest elapsed time and resume position the queue reported for item `name` since `since`."""
-    from music_assistant_models.enums import EventType
-
     elapsed: list[float] = []
     resume: list[int] = []
     # play_media first republishes the previous item at its final position

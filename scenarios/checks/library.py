@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from music_assistant_models.enums import MediaType
+
 from scenarios.checks.containers import restart_role
 from scenarios.checks.queue import play, stop, tracks
 
@@ -169,8 +171,6 @@ async def _is_favorite(client: MusicAssistantClient, track: Track) -> bool:
 
 async def _was_played(client: MusicAssistantClient, track: Track) -> bool:
     """Whether the track is among the recently played tracks, fully played or not."""
-    from music_assistant_models.enums import MediaType
-
     played = await client.music.recently_played(
         limit=RECENTLY_PLAYED_LIMIT, media_types=[MediaType.TRACK], fully_played_only=False
     )

@@ -13,6 +13,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import MediaType, ProviderType
 
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
@@ -29,8 +30,6 @@ async def test_provider_reload(
     client: MusicAssistantClient, record_testsuite_property: Callable[[str, object], None]
 ) -> None:
     """Every streaming provider reloads, is available within 60 s and returns search results."""
-    from music_assistant_models.enums import MediaType, ProviderType
-
     reloaded = {
         provider.instance_id: provider.domain
         for provider in client.providers

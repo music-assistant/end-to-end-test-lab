@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import EventType, QueueOption
 
 from labctl.analyze import Capture
 from scenarios.helpers import (
@@ -52,8 +53,6 @@ async def test_continuity(
     record_testsuite_property: Callable[[str, object], None],
 ) -> None:
     """Item 1 plays to its end and the queue moves on to item 2 without stopping in between."""
-    from music_assistant_models.enums import EventType, QueueOption
-
     player_id = players[role]
     first, second = await pick_tracks(client, 2)
     record_testsuite_property(
@@ -134,8 +133,6 @@ async def test_continuity(
 
 def _stopped(event: MassEvent, player_id: str) -> bool:
     """Whether an event shows the queue or the player of `player_id` idle or paused."""
-    from music_assistant_models.enums import EventType
-
     if event.object_id != player_id:
         return False
     if event.event == EventType.QUEUE_UPDATED:

@@ -33,7 +33,7 @@ Everything else runs on the VM. Python 3.12 or newer is only needed to run the l
 `tests/`, not to use the lab:
 
 ```
-pip install -e '.[test]'
+pip install -e '.[test,scenarios]'
 python -m pytest tests
 ```
 

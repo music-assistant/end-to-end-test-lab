@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import EventType, QueueOption
 
 from scenarios.helpers import (
     describe,
@@ -40,8 +41,6 @@ async def test_external_pause(
     record_testsuite_property: Callable[[str, object], None],
 ) -> None:
     """Pausing the Soloist engine mid-track stops the queue with a resume position."""
-    from music_assistant_models.enums import EventType, QueueOption
-
     spotify = [p for p in client.providers if p.domain == "spotify"]
     if not spotify:
         pytest.skip("needs a Spotify account set (Soloist backend); this golden has no spotify")

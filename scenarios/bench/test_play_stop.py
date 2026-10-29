@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import EventType, QueueOption
 
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
@@ -32,8 +33,6 @@ async def test_play_stop(
     record_property: Callable[[str, object], None],
 ) -> None:
     """The device reports playing after play and idle after stop; records both latencies."""
-    from music_assistant_models.enums import EventType, QueueOption
-
     player_id = players[device]
     title = next(tone.title for tone in tones.tracks if tone.id == TONE)
     [track] = await client.music.get_library_tracks(search=title, limit=1)

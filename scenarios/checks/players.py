@@ -10,6 +10,8 @@ from collections.abc import Callable, Collection
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import EventType, PlaybackState, PlayerFeature, QueueOption
+from music_assistant_models.errors import PlayerUnavailableError
 
 from scenarios.checks.containers import restart_role, start_role, stop_role
 from scenarios.checks.queue import (
@@ -180,8 +182,6 @@ async def group_plays_in_sync(ctx: CheckContext, role: str) -> None:
 
 async def member_removed_keeps_leader(ctx: CheckContext, role: str) -> None:
     """Check ungrouping a member leaves the leader playing and the member idle and usable."""
-    from music_assistant_models.enums import PlaybackState, QueueOption
-
     other = partner(role)
     leader, member = ctx.player_id(role), ctx.player_id(other)
 
@@ -234,8 +234,6 @@ async def member_removed_keeps_leader(ctx: CheckContext, role: str) -> None:
 
 async def group_skip_intact(ctx: CheckContext, role: str) -> None:
     """Check next on a group skips one track on both players and keeps the group together."""
-    from music_assistant_models.enums import EventType
-
     other = partner(role)
     leader, member = ctx.player_id(role), ctx.player_id(other)
     second = ALBUM[1]
@@ -363,8 +361,6 @@ async def member_restart_ungroups(ctx: CheckContext, role: str) -> None:
 
 async def muted_member_stays_muted(ctx: CheckContext, role: str) -> None:
     """Check a group volume change leaves a muted member muted and changes the others."""
-    from music_assistant_models.enums import PlayerFeature
-
     other = partner(role)
     leader, member = ctx.player_id(role), ctx.player_id(other)
     if PlayerFeature.VOLUME_MUTE not in _player(ctx, member).supported_features:
@@ -499,8 +495,6 @@ async def volume_after_pause(ctx: CheckContext, role: str) -> None:
 
 async def pause_holds(ctx: CheckContext, role: str) -> None:
     """Check a pause goes silent, holds for 20 s and resumes where it paused."""
-    from music_assistant_models.enums import EventType, PlaybackState
-
     queue_id = ctx.player_id(role)
     try:
         await play(ctx, queue_id, (LONG_TONE,), PAUSE_ISSUES)
@@ -556,8 +550,6 @@ async def pause_holds(ctx: CheckContext, role: str) -> None:
 
 async def disconnect_closes_stream(ctx: CheckContext, role: str) -> None:
     """Check a stopped player goes unavailable, its queue stops, and the player returns."""
-    from music_assistant_models.errors import PlayerUnavailableError
-
     queue_id = ctx.player_id(role)
     try:
         await play(ctx, queue_id, (LONG_TONE,), DISCONNECT_ISSUES)
@@ -712,8 +704,6 @@ async def _play_group(
     ctx: CheckContext, leader: str, tone_ids: tuple[str, ...], issues: tuple[str, ...]
 ) -> float:
     """Like `play`, but any playing index passes, as the server may resume instead of replace."""
-    from music_assistant_models.enums import EventType, QueueOption
-
     media = await tracks(ctx, tone_ids)
     started = time.time()
     with ctx.step("starts", issues):
@@ -749,8 +739,6 @@ async def _remove_syncgroup(ctx: CheckContext, group_id: str, leader: str, membe
 
 async def _restart_member(ctx: CheckContext, role: str, issues: tuple[str, ...]) -> float:
     """Restart a role's container in steps `member_drops` and `member_returns`; return when back."""
-    from music_assistant_models.enums import EventType
-
     player_id = ctx.player_id(role)
 
     def unavailable(event: MassEvent) -> bool:
@@ -798,8 +786,6 @@ async def _set_volume(ctx: CheckContext, player_id: str, level: int) -> None:
 
 async def _restore_volume(ctx: CheckContext, player_id: str) -> None:
     """Unmute a player and set it to full volume, as far as it has those controls."""
-    from music_assistant_models.enums import PlayerFeature
-
     player = ctx.client.players.get(player_id)
     if player is None or not player.available:
         return
@@ -906,7 +892,6 @@ async def _until_queue_stopped(ctx: CheckContext, queue_id: str, timeout: float)
 
 async def _until_client_queue_not_playing(ctx: CheckContext, queue_id: str, timeout: float) -> None:
     """Poll the client's cached queue until it is gone or no longer playing."""
-    from music_assistant_models.enums import PlaybackState
 
     def holds() -> bool:
         queue = ctx.client.player_queues.get(queue_id)
@@ -964,8 +949,6 @@ def _player(ctx: CheckContext, player_id: str) -> Player:
 
 def _is_playing(ctx: CheckContext, player_id: str) -> bool:
     """Whether the player reports playing."""
-    from music_assistant_models.enums import PlaybackState
-
     player = ctx.client.players.get(player_id)
     return player is not None and player.playback_state == PlaybackState.PLAYING
 

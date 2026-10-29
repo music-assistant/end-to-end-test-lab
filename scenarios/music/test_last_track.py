@@ -8,6 +8,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import pytest
+from music_assistant_models.enums import EventType, QueueOption
 
 from labctl.analyze import Capture
 from scenarios.helpers import (
@@ -52,8 +53,6 @@ async def test_last_track_ends_clean(
     record_testsuite_property: Callable[[str, object], None],
 ) -> None:
     """A single queued track plays to its end, the queue goes idle and nothing plays after."""
-    from music_assistant_models.enums import EventType, QueueOption
-
     player_id = players[role]
     [track] = await pick_tracks(client, 1)
     record_testsuite_property(f"last_track_ends_clean[{role}] track", describe(track))
@@ -121,8 +120,6 @@ async def test_last_track_ends_clean(
 
 def _paused(event: MassEvent, player_id: str) -> bool:
     """Whether an event shows the queue or the player of `player_id` paused."""
-    from music_assistant_models.enums import EventType
-
     if event.object_id != player_id:
         return False
     if event.event == EventType.QUEUE_UPDATED:

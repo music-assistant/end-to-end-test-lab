@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 
 import pytest
+from music_assistant_models.enums import PlayerFeature
 
 from scenarios.checks.context import CheckContext
 from scenarios.checks.players import announce_idle_only_clip, volume_set_audible
@@ -57,8 +58,6 @@ async def test_player_mpd(role: str, ctx: CheckContext) -> None:
 
 async def _journey(ctx: CheckContext, role: str) -> None:
     """Album, resume, next, volume where the player advertises it, idle announcement."""
-    from music_assistant_models.enums import PlayerFeature
-
     started = time.time()
     await album_plays_through(ctx, role)
     await resume_advances(ctx, role)
