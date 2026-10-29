@@ -90,7 +90,7 @@ lab summary <run id>                       # failures per area with checkpoint a
 lab runs --ref pr/<n>                      # the PR's runs: purpose, exit code, rerun
 lab run --ref dev --deep                   # daily deep run, not a PR check
 lab run --ref dev --deep --providers slim,slim -k test_member_rejoins   # one deep test, no account sets
-lab run --ref pr/<n> --providers devices   # hw smoke, bench journeys and state checks on every registered device, about 19 min for five
+lab run --ref pr/<n> --providers devices   # hw smoke, bench journeys and state checks on every registered device
 ```
 
 A gate (`--areas`, `--all`, or player providers alone) that fails is rerun once in a fresh
@@ -102,35 +102,11 @@ Examples:
 - `controllers/players/announcements.py` changed: `lab run --ref pr/<n> --areas players,streams`
 - `providers/wiim/player.py` changed: `lab run --ref pr/<n> --providers wiim-1`
 
-### Measured gate timings on dev (2026-10-27)
-
-Whole run, including boot (about 45 s) and the `core` journey (37 s):
-
-| Area | Run | Journey |
-|---|---|---|
-| `core` | 37 s plus boot | one role |
-| `queue` | 381 s | 64 to 74 s per role, 5 roles |
-| `streams` | 510 s | slim 257 s, sendspin 184 s |
-| `players` | 390 s together with the squeezelite journey | 239 s on slim-1 and slim-2 |
-| `library` | 99 s | 42 s |
-| `--providers <domain>` | 557 s for all six | 79 to 95 s per journey |
-
-Known red on `dev` since 2026-10-28, until the server fix lands. The checks are provider
-agnostic on purpose: a player that behaves differently is fixed in its provider, never in a check.
-They assert behaviour, not labels: a pause leaves `playing`, goes silent within 2 s and resumes
-within 1 s of where it paused, whether the player pauses in place or stops and restarts.
-
-- `next_heard` of `next_drops_previous` on `airplay-1` (`--providers airplay`): the next track
-  is heard 4.2 s after next, limit 3 s, and the skipped one can play on for 2.0 s (runs
-  20261029-082916-1957, 083118-2c9a, 083357-21e3, 082635-e1e9): the receiver drains its 2 s
-  RAOP buffer after the 1 s next debounce. Fix: the AirPlay provider flushes the receiver on a
-  skip, and the queue drops its 1 s next debounce; the flush alone lands at about 3.2 s.
-
-`core`, `queue`, `players` and `streams` on slim, airplay and dlna passed three gate runs first
-time on 2026-10-28 (server 8192482d2314 and f4c51dc251c2). The Snapcast `advances` red of
-2026-10-27 was server#7250.
-
 ### What each area checks
+
+The checks are provider agnostic on purpose: a player that behaves differently is fixed in its
+provider, never in a check. They assert behaviour, not labels: a pause leaves `playing`, goes
+silent and resumes near where it paused, whether the player pauses in place or stops and restarts.
 
 - `core`: `boot_clean` (providers loaded, roles registered, no error at boot) and `album_plays_through` on `slim-1`.
 - `queue`: `album_plays_through`, `resume_advances`, `now_playing_follows` on airplay, dlna, slim, snap and sendspin.
