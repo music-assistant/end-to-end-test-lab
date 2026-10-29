@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
     from scenarios.conftest import EventRecorder
 
-pytestmark = pytest.mark.tier2
+pytestmark = [pytest.mark.tier2, pytest.mark.timeout(180)]
 
 START_TIMEOUT_S = 30.0
 PAUSE_AFTER_S = 10.0

@@ -322,7 +322,10 @@ def _one_run(config: LabConfig, ref: str, spec: RunSpec, test_expr: str | None, 
         run, checkout, exit_code = _execute(config, lease, ref, spec, selection, keep)
         # a kept run stays up as it failed, for debugging
         if spec.rerun and exit_code == 1 and not keep:
-            exit_code = _rerun(config, lease, run, checkout, spec.marker)
+            if (run.dir / "junit.xml").exists():
+                exit_code = _rerun(config, lease, run, checkout, spec.marker)
+            else:
+                click.echo(f"run {run.id}: no junit.xml, pytest did not finish, not rerunning")
     return exit_code
 
 

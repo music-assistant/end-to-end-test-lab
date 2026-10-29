@@ -26,7 +26,7 @@ from scenarios.checks.players import (
     volume_set_audible,
 )
 
-pytestmark = [pytest.mark.deep, pytest.mark.area_players]
+pytestmark = [pytest.mark.deep, pytest.mark.area_players, pytest.mark.timeout(300)]
 
 # group checks take the role's next index of the same kind as partner
 GROUP_ROLES = ("slim-1", "snap-1", "sendspin-1")

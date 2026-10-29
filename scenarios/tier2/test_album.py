@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
     from scenarios.conftest import EventRecorder
 
-pytestmark = pytest.mark.tier2
+pytestmark = [pytest.mark.tier2, pytest.mark.timeout(180)]
 
 # the seek leaves this much of the track, so the test sees its natural end quickly
 TAIL_S = 20

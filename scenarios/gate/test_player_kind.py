@@ -10,7 +10,7 @@ from scenarios.checks.context import CheckContext
 from scenarios.checks.players import announce_idle_only_clip, volume_set_audible
 from scenarios.checks.queue import album_plays_through, next_drops_previous, resume_advances
 
-pytestmark = pytest.mark.gate
+pytestmark = [pytest.mark.gate, pytest.mark.timeout(600)]
 
 
 @pytest.mark.provider_sendspin

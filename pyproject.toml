@@ -13,7 +13,7 @@ dependencies = [
 
 [project.optional-dependencies]
 players = ["aiosendspin>=10.2"]
-test = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+test = ["pytest>=8.0", "pytest-asyncio>=0.24", "pytest-timeout>=2.3"]
 scenarios = ["music-assistant-client"]
 
 [project.scripts]
@@ -35,6 +35,9 @@ include = ["labctl*"]
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+timeout = 900
+# "thread" kills the process: no junit.xml and no `finally` teardown in the test
+timeout_method = "signal"
 addopts = "--strict-markers"
 markers = [
     "tier1: deterministic scenario on virtual players, may gate a PR",

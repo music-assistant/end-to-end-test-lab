@@ -17,7 +17,7 @@ import pytest
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
 
-pytestmark = pytest.mark.tier2
+pytestmark = [pytest.mark.tier2, pytest.mark.timeout(180)]
 
 AVAILABLE_TIMEOUT_S = 60.0
 SEARCH_QUERY = "The Beatles"

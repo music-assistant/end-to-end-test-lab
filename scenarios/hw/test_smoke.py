@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from labctl.analyze import Manifest
     from scenarios.conftest import EventRecorder
 
-pytestmark = [pytest.mark.hw, pytest.mark.tier1]
+pytestmark = [pytest.mark.hw, pytest.mark.tier1, pytest.mark.timeout(300)]
 
 TONE = "a1t4"
 # real devices buffer and start slower than the virtual players

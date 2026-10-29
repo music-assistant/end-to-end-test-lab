@@ -29,6 +29,8 @@ POTOKEN_SERVICE = "potoken"
 RADIO_SERVICE = "radio"
 RADIO_PORT = 8000
 STOP_TIMEOUT_S = 10
+# watchdog over the whole tests container; a deep run takes about 45 min
+TESTS_TIMEOUT_S = 2 * 3600
 CLIAIRPLAY_DIR = "music_assistant/providers/airplay/bin"
 # every non-Sendspin player writes 48 kHz 16-bit stereo into this FIFO; its pacer reads it
 FIFO = "/fifo/pcm"
@@ -430,9 +432,15 @@ def is_up(run: Run) -> bool:
 
 
 def run_tests(run: Run) -> int:
-    """Run the tests container in the foreground and return pytest's exit code."""
+    """Run the tests container in the foreground and return pytest's exit code, 124 on timeout."""
     cmd = ["docker", "compose", "-p", run.project, "-f", str(run.compose_file)]
-    return subprocess.run([*cmd, "run", "--rm", "-T", "tests"], check=False).returncode
+    try:
+        return subprocess.run(
+            [*cmd, "run", "--rm", "-T", "tests"], check=False, timeout=TESTS_TIMEOUT_S
+        ).returncode
+    except subprocess.TimeoutExpired:
+        print(f"run {run.id}: tests still running after {TESTS_TIMEOUT_S} s, killed")
+        return 124
 
 
 def teardown(run: Run) -> None:

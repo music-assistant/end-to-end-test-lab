@@ -9,7 +9,12 @@ from scenarios.checks.context import CheckContext
 from scenarios.checks.health import boot_clean
 from scenarios.checks.queue import album_plays_through
 
-pytestmark = [pytest.mark.gate, pytest.mark.area_core, pytest.mark.roles(*AREA_ROLES["core"])]
+pytestmark = [
+    pytest.mark.gate,
+    pytest.mark.area_core,
+    pytest.mark.roles(*AREA_ROLES["core"]),
+    pytest.mark.timeout(600),
+]
 
 
 async def test_core(role: str, ctx: CheckContext) -> None:

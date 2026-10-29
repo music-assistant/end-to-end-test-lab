@@ -22,7 +22,7 @@ from scenarios.checks.context import CheckContext
 if TYPE_CHECKING:
     from scenarios.conftest import LabRun
 
-pytestmark = [pytest.mark.hw, pytest.mark.tier1]
+pytestmark = [pytest.mark.hw, pytest.mark.tier1, pytest.mark.timeout(300)]
 
 Check = Callable[[CheckContext, str], Awaitable[None]]
 
