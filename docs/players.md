@@ -93,8 +93,9 @@ itself; MA takes the name from `-n`.
 ## snap
 
 `snapclient --player file:filename=/fifo/pcm --hostID lab-snap-1 -h ma`, container `hostname:
-lab-snap-1` (Debian trixie snapclient 0.31). The file player is real time and writes silence
-while idle (measured 191960 B/s); pacer without rate limit.
+lab-snap-1` (snapclient 0.31 built from source with `images/players/snapclient-file-player-alive.patch`:
+the stock file player ticks on a destroyed player at every stream change and hangs or crashes). The file
+player is real time and writes silence while idle (measured 191960 B/s); pacer without rate limit.
 
 Provider: `snapcast` (`config/providers/setup`, no values). The official image ships `snapserver`,
 so the provider defaults to its builtin server on 1704/1705. MA names the client after the

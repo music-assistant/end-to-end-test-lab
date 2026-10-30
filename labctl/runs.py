@@ -439,10 +439,16 @@ def run_tests(run: Run) -> int:
 
 
 def teardown(run: Run) -> None:
-    """Stop everything, keep the server log, remove the project and hand files back to us."""
+    """Stop everything, keep the server and player logs, remove the project and hand files back."""
     # SIGTERM lets the capture sidecars finalize their files; stop waits for them to exit
     _compose(run, "stop", "-t", str(STOP_TIMEOUT_S))
     (run.dir / "ma.log").write_text(_compose(run, "logs", "--no-color", "--no-log-prefix", "ma"))
+    if run.roles:
+        # exit status first: a crashed player logs nothing about its death
+        pacers = [f"{role}-pacer" for role in run.roles if role_kind(role) != "sendspin"]
+        status = _compose(run, "ps", "-a", "--format", "{{.Name}} {{.Status}}", *run.roles, *pacers)
+        logs = _compose(run, "logs", "--no-color", "-t", *run.roles, *pacers)
+        (run.dir / "players.log").write_text(status + logs)
     _compose(run, "down", "-v", "--remove-orphans")
     chown_to_me(run.dir)
     if run.account_data is not None:

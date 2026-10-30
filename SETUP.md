@@ -249,7 +249,7 @@ ssh lab 'cd /srv/lab/src && docker build -t lab/players:latest -f images/players
 ssh lab 'cd /srv/lab/src && .venv/bin/python -m tones.generate --out /srv/lab/music/tones'
 ```
 
-`lab/players` (about 30 s, 1.4 GB) holds every virtual player and the capture tools; rebuild it
+`lab/players` (about 30 s, plus some minutes for the snapclient build the first time, 1.4 GB) holds every virtual player and the capture tools; rebuild it
 after changing its Dockerfile or `labctl/pacer.py`. The first run in step 8 clones the bare
 mirror of music-assistant/server (about 700 MB), creates the `dev` worktree, downloads the
 cliairplay binary the ref pins and pulls the base image. The lab server image `lab/ma:<tag>` is

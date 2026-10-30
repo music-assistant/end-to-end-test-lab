@@ -91,6 +91,7 @@ A run leaves `/srv/lab/runs/<run id>/` (the id is a UTC timestamp plus a suffix)
 summary.json      run_id, ref, sha, purpose, base image digest the build used (from its provenance), roles, areas, deep, duration_s, exit_code, junit totals; a rerun gate run adds rerun_run_id and reruns
 junit.xml         pytest results
 ma.log            server log, written at teardown
+players.log       player and pacer container logs with timestamps, written at teardown; a snapclient or squeezelite that died or hung is diagnosed here
 captures/         <role>.pcm, .stamps and .json per role: the audio received, per-write timestamps, format
 compose.yml       the rendered compose project, named lab-<run id>
 run.json          ref, sha (so gc keeps the worktree), purpose, areas, deep and devices; written first, before any slow step. Kept runs add the hold id
@@ -103,7 +104,7 @@ Reading a failed run:
 
 1. Look at `summary.json`. `exit_code: null` and `junit: null` mean the run failed before pytest, and the CLI error says where. Bootstrap waits 180 s for the server, 60 s for the tone library to reach 8 tracks and 60 s for all roles to register (`players missing after 60 s: [...]`).
 2. `lab summary <run id>` names the failing tests per area with their checkpoint. Open `junit.xml` for the failing test and its message. When one role is missing, only that role's case errors at setup (`player not available after 60 s: <role>`).
-3. `lab logs <run id>` prints `ma.log`. Search it for the player's name (`lab-<role>`), provider errors and stream start and stop lines.
+3. `lab logs <run id>` prints `ma.log`. Search it for the player's name (`lab-<role>`), provider errors and stream start and stop lines. A role that went unavailable: `players.log` starts with each player container's exit status and holds its log.
 4. For audio problems read the capture with the analyzer. Segment kinds are a tone id (`a1t1` and so on), `silence` (below -60 dB), `mixed` and `unknown`. Times are wall-clock epoch seconds, and -12 dB is the tone at full volume.
 
 ```
@@ -127,13 +128,13 @@ ssh lab 'ffmpeg -f s16le -ar 48000 -ac 2 -i /srv/lab/runs/<run id>/captures/airp
 
 6. A failed testcase in `junit.xml` has `checkpoint` and `issues` properties, and `failed_checkpoint` and `failed_issues` for the step that failed. A checkpoint is `<check>.<step>`, such as `album_plays_through.tones_in_order`, so a journey's failure names the check as well as the step. `started_at` and `ended_at` are the test's wall-clock start and end in epoch seconds, the clock of the capture timelines and of the events below. The failure text of a test that failed in its call phase ends with an `events` section: the test's last 20 server events, one per line with time, event type, object id and the state, index, elapsed time or volume they carry.
 
-`--keep` skips teardown, so the compose project `lab-<run id>` stays up and `ma.log` does not exist yet. The server is published on the VM's loopback only. To poke at it:
+`--keep` skips teardown, so the compose project `lab-<run id>` stays up and `ma.log` and `players.log` do not exist yet. The server is published on the VM's loopback only. To poke at it:
 
 ```
 ssh lab 'docker compose -p lab-<run id> logs ma'
 ssh lab 'docker compose -p lab-<run id> port ma 8095'
 ssh lab 'cd /srv/lab/runs/<run id> && docker compose -p lab-<run id> -f compose.yml run --rm -T tests'   # rerun pytest
-lab release <run id>                                                                                      # tear down, writes ma.log, ends the hold
+lab release <run id>                                                                                      # tear down, writes ma.log and players.log, ends the hold
 ```
 
 When `lab run --keep` returns, labd turns the run's lease into a hold of `keep_ttl_s` seconds (`[broker]` in `lab.toml`, default 14400, so 4 h) and `run.json` records its id. The kept run keeps its slot and account set and shows in `lab status` as a lease until `lab release <run id>` tears it down and releases the hold. If the hold expires first, the project stays up but no longer counts against capacity. Rerunning pytest uses the run's own `src/` copy, so later syncs of the repo do not reach it.
@@ -347,7 +348,7 @@ ssh lab 'journalctl -u lab-gc'
 ssh lab 'docker ps'              # leftover lab-<run id> projects point at forgotten --keep runs
 ```
 
-Images. The server image `lab/ma:<tag>` is rebuilt by every `lab run` with `--pull`, so a tag-only base such as `server:stable` moves to its latest release; it is a cached no-op unless the base or `images/ma/entrypoint.sh` changed. The players image is not: rebuild it after a change to `images/players/`, to `labctl/pacer.py` or `labctl/sendspin_client.py`, or to the dependencies in `pyproject.toml` (the tests run from the venv baked into it), otherwise the old code runs (the first AirPlay run after a pacer change died on a missing FIFO). Scenarios and `labctl` are copied from the synced repo into the run's `src/` when the run is created and need no rebuild.
+Images. The server image `lab/ma:<tag>` is rebuilt by every `lab run` with `--pull`, so a tag-only base such as `server:stable` moves to its latest release; it is a cached no-op unless the base or `images/ma/entrypoint.sh` changed. The players image is not: rebuild it after a change to `images/players/` (its first stage builds snapclient 0.31 from source with `snapclient-file-player-alive.patch`, see the Dockerfile; drop the stage once the snapclient package the image installs carries the fix), to `labctl/pacer.py` or `labctl/sendspin_client.py`, or to the dependencies in `pyproject.toml` (the tests run from the venv baked into it), otherwise the old code runs (the first AirPlay run after a pacer change died on a missing FIFO). Scenarios and `labctl` are copied from the synced repo into the run's `src/` when the run is created and need no rebuild.
 
 Nightly digest. The nightly image is pinned in `[images] nightly` in `/srv/lab/src/config/lab.toml`. To move it, pull the tag, read the digest, edit the line, then prewarm:
 
