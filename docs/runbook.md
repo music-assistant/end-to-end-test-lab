@@ -61,7 +61,7 @@ With a music provider in the list the players are only its stage: `--providers s
 
 Every run has a purpose, which the lease, `run.json` and `summary.json` carry and `lab status` and `lab runs` show: `gate <ref> <areas> [<domains>]`, `all <ref>`, `deep <ref>` and `deep <ref> <set>` for its music runs, `music <ref> <set>`, `smoke <ref>` or `bench <ref> <ids>`, plus ` keep` with `--keep`. A gate's rerun has the same purpose.
 
-Which areas a PR needs is in [README.md](../README.md#which-areas-for-my-diff).
+Which areas a PR needs is in [pr-gate.md](pr-gate.md).
 
 Ref forms are `dev`, `stable`, any branch name, a sha, or `pr/<n>` (fetched from `refs/pull/<n>/head`). The mirror is fetched on every run. The base image follows from the sha: a sha on `stable`, or forked from `stable` more recently than from `dev`, runs on the stable image, anything else on the nightly digest in `lab.toml`. The ref's checkout is mounted read-only at `/src`, and the server container installs the ref's `requirements_all.txt` at start through a shared uv cache.
 
