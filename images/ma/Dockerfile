@@ -4,9 +4,10 @@
 ARG BASE
 FROM ${BASE}
 
-# git for requirements pinned to a git URL
+# git for requirements pinned to a git URL, compilers for the ones built from source at
+# install time (lc3py); same packages as the server Dockerfile
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git gcc g++ \
     && rm -rf /var/lib/apt/lists/*
 
 COPY entrypoint.sh /usr/local/bin/lab-entrypoint.sh
