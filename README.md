@@ -23,7 +23,7 @@ nightly, agents that gate PRs, and anyone reproducing a player bug against virtu
 | Path | Purpose |
 |---|---|
 | `labctl/` | broker (`labd`), CLI (`labctl`), leases, refs, run lifecycle, bootstrap, pacer, Sendspin client, analyzer |
-| `images/ma/` | lab server image: official image + git, entrypoint reconciles requirements and runs the mounted checkout |
+| `images/ma/` | lab server image: official image + git, gcc and g++, entrypoint reconciles requirements and runs the mounted checkout |
 | `images/players/` | one image with every virtual player (gmediarender, squeezelite, snapclient, mpd, aiosendspin client), plus the MPD config |
 | `images/shairport/` | config mounted into the official shairport-sync image for the AirPlay role |
 | `tones/` | tone library generator and manifest |
