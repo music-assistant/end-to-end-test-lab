@@ -1,6 +1,8 @@
-"""Server log helpers of the scenarios."""
+"""Server log and track picker helpers of the scenarios."""
 
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 
@@ -26,3 +28,29 @@ def test_ma_log_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         "2026-10-27 09:12:01.123 ERROR (MainThread) [music_assistant] boom",
         "2026-10-27 09:12:01.300 CRITICAL (MainThread) [music_assistant] down",
     ]
+
+
+async def test_pick_tracks_searches_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A search that returns nothing yet is asked again, as MA keeps a slow provider searching."""
+    track = SimpleNamespace(
+        uri="spotify://track/1",
+        provider="spotify",
+        duration=180,
+        provider_mappings=[SimpleNamespace(available=True)],
+    )
+    results = iter([[], [track]])
+
+    async def search(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(tracks=next(results))
+
+    async def get_library_tracks(**_kwargs: object) -> list[object]:
+        return []
+
+    client = cast(
+        Any,
+        SimpleNamespace(
+            music=SimpleNamespace(search=search, get_library_tracks=get_library_tracks)
+        ),
+    )
+    monkeypatch.setattr(helpers, "SEARCH_RETRY_S", 0)
+    assert await helpers.pick_tracks(client, 1) == [track]

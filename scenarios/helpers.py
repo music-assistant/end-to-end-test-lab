@@ -32,6 +32,9 @@ LIBRARY_LIMIT = 500
 # fallback for sets whose library has too few short tracks; every service has these
 SEARCH_QUERY = "The Beatles"
 SEARCH_LIMIT = 50
+# a provider that misses MA's search budget keeps searching in the background, so ask again
+SEARCH_ATTEMPTS = 4
+SEARCH_RETRY_S = 5.0
 ENGINE_COMMAND_TIMEOUT_S = 5.0
 
 
@@ -39,7 +42,11 @@ async def pick_tracks(client: MusicAssistantClient, count: int) -> list[Track]:
     """Return `count` available tracks of 1 to 4 minutes, library first (by name), else search."""
     library = await client.music.get_library_tracks(limit=LIBRARY_LIMIT, sort_field=SortField.NAME)
     picked = _fitting(library, count)
-    if len(picked) < count:
+    for attempt in range(SEARCH_ATTEMPTS):
+        if len(picked) >= count:
+            break
+        if attempt:
+            await asyncio.sleep(SEARCH_RETRY_S)
         found = await client.music.search(SEARCH_QUERY, [MediaType.TRACK], limit=SEARCH_LIMIT)
         picked = _fitting((track for track in found.tracks if track.provider != "library"), count)
     if len(picked) < count:
