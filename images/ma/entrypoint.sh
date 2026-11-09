@@ -22,8 +22,9 @@ if [ "$required" != "$available" ]; then
 fi
 uv pip install --python "$PY" --force-reinstall --no-deps "$wheel"
 
-frontend_pin=$(grep -o '"music-assistant-frontend==[^"]*"' /src/pyproject.toml | tr -d '"')
-if ! grep -qx "$frontend_pin" /src/requirements_all.txt; then
+# refs that pin the frontend by release URL carry it in requirements_all.txt already
+frontend_pin=$(grep -o '"music-assistant-frontend==[^"]*"' /src/pyproject.toml | tr -d '"' || true)
+if [ -n "$frontend_pin" ] && ! grep -qx "$frontend_pin" /src/requirements_all.txt; then
     uv pip install --python "$PY" "$frontend_pin"
 fi
 
