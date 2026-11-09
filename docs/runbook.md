@@ -232,11 +232,12 @@ on the server's loopback and publishes its port in `/data/spotify/<instance>/sol
 ### Music scenarios
 
 - `continuity` (every set): two tracks of 1 to 4 minutes (the first two library tracks by name,
-  else the first two hits of a `The Beatles` search), seek item 1 to 20 s before its end, then the
-  queue must advance to item 2 without going idle or paused, the capture must have no silence
-  over 1 s until 3 s before the end and no gap of 3 s or more at the boundary, and the server log
-  must have no `stopping queue` line. This is support#6860: with Autoplay OFF on the Spotify
-  account, a Soloist engine reports `paused` at the end of every item.
+  else the first two hits of a `The Beatles` search, asked up to 4 times 5 s apart because a
+  provider that misses the server's 8 s search budget only answers a later search), seek item 1
+  to 20 s before its end, then the queue must advance to item 2 without going idle or paused, the
+  capture must have no silence over 1 s until 3 s before the end and no gap of 3 s or more at the
+  boundary, and the server log must have no `stopping queue` line. This is support#6860: with
+  Autoplay OFF on the Spotify account, a Soloist engine reports `paused` at the end of every item.
 - `external_pause` (sets with a `spotify` provider, skipped elsewhere): 10 s into a track the test
   sends `pause` on the engine's own WebSocket, as the Spotify app would. The queue must stop within
   3 s (first queue update with a resume position) and go idle on item 1 with that position kept
