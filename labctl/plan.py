@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from labctl import areas
-from labctl.config import PLAYER_KINDS
 from labctl.runs import parse_roles, role_kind
 
 
@@ -66,9 +65,11 @@ def plan(
     elif listed:
         purpose = areas.purpose("gate", ref, ",".join(_domains(listed)), keep=keep)
         marker = areas.gate_expression((), _domains(listed))
-        specs.append(RunSpec("gate", purpose, _with_core(listed), marker, rerun=True))
+        roles = _with_core(areas.with_journey_roles(listed))
+        specs.append(RunSpec("gate", purpose, roles, marker, rerun=True))
     else:
-        roles = parse_roles(",".join(PLAYER_KINDS))
+        # the smoke test plays on every role, so only the kinds with audio
+        roles = parse_roles(",".join(areas.PLAYER_DOMAINS))
         purpose = areas.purpose("smoke", ref, keep=keep)
         specs.append(RunSpec("smoke", purpose, roles, "smoke"))
     stage = listed[:1] or ("sendspin-1",)

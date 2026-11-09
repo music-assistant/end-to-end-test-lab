@@ -24,7 +24,8 @@ from labctl.refs import Checkout
 
 RUN_META = "run.json"
 MA_PORT = 8095
-PLAYERS_IMAGE = "lab/players:latest"
+# overridable to try a players image change without replacing the image other runs use
+PLAYERS_IMAGE = os.environ.get("LAB_PLAYERS_IMAGE", "lab/players:latest")
 POTOKEN_SERVICE = "potoken"
 RADIO_SERVICE = "radio"
 RADIO_PORT = 8000
@@ -37,6 +38,8 @@ FIFO = "/fifo/pcm"
 PCM_BYTES_PER_SECOND = 48000 * 2 * 2
 # players that write as fast as the FIFO drains; their pacer drains it at the PCM rate
 UNPACED_KINDS = ("slim", "mpd")
+# Sendspin client kinds: no FIFO or pacer, the player writes its own capture
+SENDSPIN_KINDS = ("sendspin", "sendspinviz")
 MPD_PORT = 6600
 APP_VARS_PATH = "/secrets/app_vars.json"
 # where scenarios see the server's data dir
@@ -290,7 +293,7 @@ def render_compose(
         services[RADIO_SERVICE] = _radio_service(run)
     volumes: dict[str, Any] = {}
     for role in run.roles:
-        if role_kind(role) == "sendspin":
+        if role_kind(role) in SENDSPIN_KINDS:
             services[role] = _sendspin_service(run, role)
             continue
         fifo_volume = f"{role}-fifo"
@@ -445,7 +448,7 @@ def teardown(run: Run) -> None:
     (run.dir / "ma.log").write_text(_compose(run, "logs", "--no-color", "--no-log-prefix", "ma"))
     if run.roles:
         # exit status first: a crashed player logs nothing about its death
-        pacers = [f"{role}-pacer" for role in run.roles if role_kind(role) != "sendspin"]
+        pacers = [f"{role}-pacer" for role in run.roles if role_kind(role) not in SENDSPIN_KINDS]
         status = _compose(run, "ps", "-a", "--format", "{{.Name}} {{.Status}}", *run.roles, *pacers)
         logs = _compose(run, "logs", "--no-color", "-t", *run.roles, *pacers)
         (run.dir / "players.log").write_text(status + logs)
@@ -559,20 +562,23 @@ def write_summary(
 
 
 def _sendspin_service(run: Run, role: str) -> dict[str, Any]:
-    """Headless Sendspin client that writes its own capture."""
+    """Headless Sendspin client that writes its own capture, or a visualizer without one."""
+    command = [
+        "lab-sendspin",
+        "--role",
+        role,
+        "--dir",
+        "/captures",
+        "--server",
+        service_host(run, "ma"),
+        "--identity",
+        f"{run.identity_scope}-{role}",
+    ]
+    if role_kind(role) == "sendspinviz":
+        command.append("--visualizer")
     return {
         "image": PLAYERS_IMAGE,
-        "command": [
-            "lab-sendspin",
-            "--role",
-            role,
-            "--dir",
-            "/captures",
-            "--server",
-            service_host(run, "ma"),
-            "--identity",
-            f"{run.identity_scope}-{role}",
-        ],
+        "command": command,
         "volumes": [f"{run.captures_dir}:/captures"],
         "stop_grace_period": f"{STOP_TIMEOUT_S}s",
     }

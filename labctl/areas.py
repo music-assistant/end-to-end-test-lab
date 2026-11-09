@@ -24,6 +24,10 @@ PLAYER_DOMAINS = {
     "snap": "snapcast",
     "mpd": "mpd",
 }
+# roles a provider's journey boots next to its `<kind>-1`, for the checks that need company
+JOURNEY_ROLES: dict[str, tuple[str, ...]] = {
+    "sendspin": ("sendspin-2", "sendspinviz-1"),
+}
 # provider domain per account set name prefix: set `apple-a` holds an `apple_music` provider
 ACCOUNT_SET_PROVIDERS = {
     "spotify": "spotify",
@@ -46,6 +50,7 @@ DEEP_ROLES = (
     "snap-1",
     "snap-2",
     "mpd-1",
+    "sendspinviz-1",
 )
 # --providers word for every registered bench device
 ALL_DEVICES = "devices"
@@ -137,9 +142,16 @@ def gate_roles(areas: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def all_roles() -> tuple[str, ...]:
-    """Return the roles of a run over every area and journey: the areas' plus one of each kind."""
-    roles = gate_roles(tuple(AREA_ROLES))
-    return roles + tuple(f"{k}-1" for k in PLAYER_DOMAINS if f"{k}-1" not in roles)
+    """Return the roles of a run over every area and journey: the areas' plus every journey's."""
+    journeys = (f"{kind}-1" for kind in PLAYER_DOMAINS)
+    return with_journey_roles(gate_roles(tuple(AREA_ROLES)) + tuple(journeys))
+
+
+def with_journey_roles(roles: tuple[str, ...]) -> tuple[str, ...]:
+    """Return `roles` plus the roles the journeys of their kinds boot, each once."""
+    domains = (PLAYER_DOMAINS.get(role.rsplit("-", 1)[0]) for role in roles)
+    extra = (role for domain in domains for role in JOURNEY_ROLES.get(domain or "", ()))
+    return tuple(dict.fromkeys((*roles, *extra)))
 
 
 def _account_set(domain: str, account_sets: list[str]) -> str:

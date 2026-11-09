@@ -1,4 +1,8 @@
-"""Headless Sendspin player that captures received audio at its scheduled play-at time."""
+"""Headless Sendspin player that captures received audio at its scheduled play-at time.
+
+With `--visualizer` it is a visualizer-only client instead, like Hue Entertainment: no player
+role, no audio and no capture.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +17,11 @@ from aiohttp import ClientError
 from aiosendspin.client import AudioFormat, SendspinClient
 from aiosendspin.models.player import ClientHelloPlayerSupport, SupportedAudioFormat
 from aiosendspin.models.types import AudioCodec, Roles
+from aiosendspin.models.visualizer import (
+    ClientHelloVisualizerSpectrum,
+    ClientHelloVisualizerSupport,
+    VisualizerStatePayload,
+)
 from aiosendspin.noise.driver import HandshakeAbortedError
 from aiosendspin.noise.keys import Identity
 from aiosendspin.noise.pairing import PairingError
@@ -28,6 +37,13 @@ SENDSPIN_PORT = 8927
 RECONNECT_INTERVAL = 2.0
 # About five seconds of 48 kHz 16-bit stereo; chunks are queued in memory, never dropped.
 BUFFER_CAPACITY = 1024 * 1024
+# what the Hue Entertainment bridge asks for: beats, peaks and a 17-bin mel spectrum at 20 Hz
+VISUALIZER_BUFFER_CAPACITY = 2048
+VISUALIZER_STATE = VisualizerStatePayload(
+    types=["beat", "peak", "spectrum"],
+    rate_max=20,
+    spectrum=ClientHelloVisualizerSpectrum(n_disp_bins=17, scale="mel", f_min=20, f_max=20000),
+)
 
 
 class SendspinCapture:
@@ -78,26 +94,36 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--dir", required=True, type=Path, help="captures directory")
     parser.add_argument("--server", default="ma", help="Music Assistant host")
     parser.add_argument("--identity", required=True, help="stable seed, <run_id>-<role>")
+    parser.add_argument("--visualizer", action="store_true", help="visualizer role only")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    asyncio.run(_run(args.role, args.dir, args.server, args.identity))
+    asyncio.run(_run(args.role, args.dir, args.server, args.identity, args.visualizer))
 
 
-async def _run(role: str, captures_dir: Path, server: str, identity_seed: str) -> None:
+async def _run(
+    role: str, captures_dir: Path, server: str, identity_seed: str, visualizer: bool
+) -> None:
     """Connect, capture and keep reconnecting until SIGTERM or SIGINT."""
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     loop.add_signal_handler(signal.SIGTERM, stop.set)
     loop.add_signal_handler(signal.SIGINT, stop.set)
 
-    writer = CaptureWriter(role, captures_dir, SAMPLE_RATE, CHANNELS)
-    client = await _create_client(role, identity_seed)
-    capture = SendspinCapture(client, writer)
+    store = InMemoryClientPairingStore()
+    await store.store_pairing_config(
+        ClientPairingConfig(dynamic_pairing_code_enabled=False, unpaired_access_enabled=True)
+    )
+    identity = _identity(identity_seed)
+    writer: CaptureWriter | None = None
+    if visualizer:
+        client = _visualizer_client(role, identity, store)
+    else:
+        writer = CaptureWriter(role, captures_dir, SAMPLE_RATE, CHANNELS)
+        client = _player_client(role, identity, store)
     LOGGER.info("lab-%s has client id %s", role, client.identity.peer_id)
-    tasks = [
-        asyncio.create_task(capture.run()),
-        asyncio.create_task(_connect_loop(client, f"ws://{server}:{SENDSPIN_PORT}/sendspin")),
-    ]
+    tasks = [asyncio.create_task(_connect_loop(client, f"ws://{server}:{SENDSPIN_PORT}/sendspin"))]
+    if writer is not None:
+        tasks.append(asyncio.create_task(SendspinCapture(client, writer).run()))
     try:
         await stop.wait()
     finally:
@@ -105,17 +131,16 @@ async def _run(role: str, captures_dir: Path, server: str, identity_seed: str) -
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await client.disconnect()
-        writer.close()
+        if writer is not None:
+            writer.close()
 
 
-async def _create_client(role: str, identity_seed: str) -> SendspinClient:
-    """Build a PCM-only player client that admits unpaired access."""
-    store = InMemoryClientPairingStore()
-    await store.store_pairing_config(
-        ClientPairingConfig(dynamic_pairing_code_enabled=False, unpaired_access_enabled=True)
-    )
+def _player_client(
+    role: str, identity: Identity, store: InMemoryClientPairingStore
+) -> SendspinClient:
+    """Build a PCM-only player client."""
     return SendspinClient(
-        _identity(identity_seed),
+        identity,
         f"lab-{role}",
         [Roles.PLAYER],
         pairing_store=store,
@@ -131,6 +156,20 @@ async def _create_client(role: str, identity_seed: str) -> SendspinClient:
             buffer_capacity=BUFFER_CAPACITY,
             supported_commands=[],
         ),
+    )
+
+
+def _visualizer_client(
+    role: str, identity: Identity, store: InMemoryClientPairingStore
+) -> SendspinClient:
+    """Build a client with the visualizer role only, as Hue Entertainment registers."""
+    return SendspinClient(
+        identity,
+        f"lab-{role}",
+        [Roles.VISUALIZER],
+        pairing_store=store,
+        visualizer_support=ClientHelloVisualizerSupport(buffer_capacity=VISUALIZER_BUFFER_CAPACITY),
+        visualizer_state=VISUALIZER_STATE,
     )
 
 

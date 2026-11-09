@@ -47,6 +47,7 @@ MEMBER_REMOVED_ISSUES = ("#5559", "#6016", "#5431")
 GROUP_SKIP_ISSUES = ("server#6611",)
 GROUP_ANNOUNCE_ISSUES = ("#6341", "#6159")
 REJOIN_ISSUES = ("#6191", "#5880")
+VISUALIZER_LEADER_ISSUES = ("#7029", "server#7461")
 RESTART_UNGROUP_ISSUES = ("#6191",)
 MUTED_MEMBER_ISSUES = ("#5098",)
 VOLUME_SET_ISSUES = ("#5638",)
@@ -150,6 +151,11 @@ def partner(role: str) -> str:
     """Return the role of the same kind with the next index: `slim-1` -> `slim-2`."""
     kind, index = role.rsplit("-", 1)
     return f"{kind}-{int(index) + 1}"
+
+
+def visualizer(role: str) -> str:
+    """Return the visualizer-only role of a role's provider: `sendspin-1` -> `sendspinviz-1`."""
+    return f"{role.rsplit('-', 1)[0]}viz-1"
 
 
 @check
@@ -326,6 +332,53 @@ async def member_rejoins(ctx: CheckContext, role: str) -> None:
             await _until_rejoined(ctx, group_id, member, REJOIN_TIMEOUT_S)
             await _heard(ctx, other, (LONG_TONE,), returned, HEARD_MIN_S, REJOIN_HEARD_S)
     finally:
+        if group_id is not None:
+            await _remove_syncgroup(ctx, group_id, leader, member)
+
+
+@check
+async def leader_removed_with_visualizer_keeps_playing(ctx: CheckContext, role: str) -> None:
+    """Check removing a syncgroup's leader keeps the next speaker playing past a visualizer."""
+    other, viz_role = partner(role), visualizer(role)
+    leader, viz, member = ctx.player_id(role), ctx.player_id(viz_role), ctx.player_id(other)
+    group_id: str | None = None
+    try:
+        with ctx.step("groups", VISUALIZER_LEADER_ISSUES):
+            # dynamic, as the server refuses to remove a static member; the reported order
+            group = await ctx.client.players.create_group_player(
+                SYNCGROUP_PROVIDER, f"lab visualizer {role}", [leader, viz, member], dynamic=True
+            )
+            group_id = group.player_id
+            # a set: the server reports a wrapped player's members without their order
+            await _until_player(
+                ctx,
+                group_id,
+                f"members {leader}, {viz} and {member}",
+                lambda p: set(p.group_members) == {leader, viz, member},
+                GROUP_TIMEOUT_S,
+            )
+        started = await _play_group(ctx, group_id, (LONG_TONE,), VISUALIZER_LEADER_ISSUES)
+        with ctx.step("both_play", VISUALIZER_LEADER_ISSUES):
+            for heard_on in (role, other):
+                await _heard(ctx, heard_on, (LONG_TONE,), started, HEARD_MIN_S, HEARD_TIMEOUT_S)
+
+        removed = time.time()
+        await ctx.client.players.set_members(group_id, player_ids_to_remove=[leader])
+        with ctx.step("member_keeps_playing", VISUALIZER_LEADER_ISSUES):
+            watched = removed + LEADER_WATCH_S
+            await _sleep_until(watched + CAPTURE_SETTLE_S)
+            timeline = ctx.capture(other).timeline()
+            gaps = [
+                seg
+                for seg in silences(timeline, removed, watched)
+                if seg.duration >= MAX_LEADER_GAP_S
+            ]
+            assert not gaps, f"{other} silent after the leader left: {describe(gaps, removed)}"
+            queue = ctx.client.player_queues.get(group_id)
+            state = queue.state if queue is not None else None
+            assert state == PlaybackState.PLAYING, f"group queue {state} after the leader left"
+    finally:
+        await stop(ctx, leader)
         if group_id is not None:
             await _remove_syncgroup(ctx, group_id, leader, member)
 

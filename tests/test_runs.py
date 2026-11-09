@@ -89,6 +89,16 @@ def test_two_sendspin(config: LabConfig) -> None:
     assert services["tests"]["environment"]["LAB_ROLES"] == "sendspin-1,sendspin-2"  # type: ignore[index]
 
 
+def test_sendspin_visualizer(config: LabConfig) -> None:
+    """A visualizer role is a Sendspin client in visualizer mode, without a pacer."""
+    services = render(config, "sendspin,sendspinviz")
+    assert list(services) == ["ma", "radio", "sendspin-1", "sendspinviz-1", "tests"]
+    command = services["sendspinviz-1"]["command"]
+    assert command[:3] == ["lab-sendspin", "--role", "sendspinviz-1"]  # type: ignore[index]
+    assert command[-1] == "--visualizer"  # type: ignore[index]
+    assert "--visualizer" not in services["sendspin-1"]["command"]  # type: ignore[operator]
+
+
 @pytest.mark.parametrize(
     ("kind", "command_head"),
     [

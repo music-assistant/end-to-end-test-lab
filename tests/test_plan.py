@@ -55,6 +55,12 @@ def test_players_alone() -> None:
     )
 
 
+def test_players_alone_journey_roles() -> None:
+    """A journey that needs company boots it: Sendspin a second player and a visualizer."""
+    [spec] = specs(Providers(kinds=("sendspin",)))
+    assert spec.roles == ("slim-1", "sendspin-1", "sendspin-2", "sendspinviz-1")
+
+
 def test_all() -> None:
     """Everything marked gate, on every area's roles plus one of each kind."""
     [spec] = specs(all_areas=True, keep=True)
@@ -93,7 +99,7 @@ def test_devices_with_sendspin() -> None:
 def test_deep() -> None:
     """The deep run on every deep role, then every frozen set on sendspin-1."""
     deep, spotify, tidal = specs(deep=True)
-    assert (deep.purpose, deep.marker, deep.deep, len(deep.roles)) == ("deep dev", "deep", True, 9)
+    assert (deep.purpose, deep.marker, deep.deep, len(deep.roles)) == ("deep dev", "deep", True, 10)
     assert spotify == RunSpec(
         "deep", "deep dev spotify-a", ("sendspin-1",), "music", account_set="spotify-a", deep=True
     )

@@ -26,7 +26,7 @@ def test_gate_expression() -> None:
 
 
 def test_all_roles() -> None:
-    """A run over everything boots every area's roles and one of each player kind."""
+    """A run over everything boots every area's roles, one of each kind and the journeys' roles."""
     assert areas.all_roles() == (
         "slim-1",
         "airplay-1",
@@ -35,6 +35,8 @@ def test_all_roles() -> None:
         "sendspin-1",
         "slim-2",
         "mpd-1",
+        "sendspin-2",
+        "sendspinviz-1",
     )
 
 

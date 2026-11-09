@@ -78,6 +78,7 @@ silent and resumes near where it paused, whether the player pauses in place or s
 - `players`: group, announce, volume and pause checks on `slim-1` and `slim-2`.
 - `library`: `scan_matches_manifest`, `rows_survive_restart`.
 - `--providers <domain>`: album, resume, next drops the previous track, volume when the player advertises it, and announce on that provider's one role (`gate/test_player_kind.py`, marker `provider_<domain>`, area `<domain>` in `lab summary`).
+- `--providers sendspin` also boots `sendspin-2` and the visualizer-only client `sendspinviz-1` (a stand-in for Hue Entertainment) and runs `leader_removed_with_visualizer_keeps_playing`: a dynamic syncgroup of `[sendspin-1, sendspinviz-1, sendspin-2]` plays, `sendspin-1` is removed from its members, and `sendspin-2` must stay free of silence of 1 s or more for 10 s with the group queue still playing.
 
 Every check records the support issue ids it covers as JUnit properties. `lab summary` prints them for
 failed tests.

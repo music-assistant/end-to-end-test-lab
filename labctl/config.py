@@ -12,8 +12,9 @@ from labctl.devices import Device
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = REPO_ROOT / "config" / "lab.toml"
-# virtual player kinds a run starts as `<kind>-<n>` roles
-PLAYER_KINDS = ("sendspin", "airplay", "dlna", "slim", "snap", "mpd")
+# virtual player kinds a run starts as `<kind>-<n>` roles; `sendspinviz` is a visualizer-only
+# Sendspin client, which only provider journeys boot
+PLAYER_KINDS = ("sendspin", "airplay", "dlna", "slim", "snap", "mpd", "sendspinviz")
 
 
 @dataclass(frozen=True)

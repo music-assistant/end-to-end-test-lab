@@ -8,7 +8,11 @@ import pytest
 from music_assistant_models.enums import PlayerFeature
 
 from scenarios.checks.context import CheckContext
-from scenarios.checks.players import announce_idle_only_clip, volume_set_audible
+from scenarios.checks.players import (
+    announce_idle_only_clip,
+    leader_removed_with_visualizer_keeps_playing,
+    volume_set_audible,
+)
 from scenarios.checks.queue import album_plays_through, next_drops_previous, resume_advances
 
 pytestmark = [pytest.mark.gate, pytest.mark.timeout(600)]
@@ -19,6 +23,13 @@ pytestmark = [pytest.mark.gate, pytest.mark.timeout(600)]
 async def test_player_sendspin(role: str, ctx: CheckContext) -> None:
     """A Sendspin player plays an album, resumes, skips and announces."""
     await _journey(ctx, role)
+
+
+@pytest.mark.provider_sendspin
+@pytest.mark.roles("sendspin-1")
+async def test_player_sendspin_visualizer_leader(role: str, ctx: CheckContext) -> None:
+    """A Sendspin syncgroup keeps playing when its leader leaves and a visualizer is next."""
+    await leader_removed_with_visualizer_keeps_playing(ctx, role)
 
 
 @pytest.mark.provider_airplay

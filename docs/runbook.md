@@ -50,11 +50,11 @@ lab run --ref <ref> [--providers <list>] [--areas <areas> | --all | --deep] [-k 
 The flags pick what runs:
 
 - `--areas <a>,<b>`: a gate with `-m "gate and (area_core or area_<a> ...)"`, `core` always included. The roles are the union of the areas' roles, or the listed player providers plus `slim-1` for `core`, so `core` never skips.
-- Player providers without `--areas`, `--all` or `--deep`: a gate over `core` and each provider's journey, `-m "gate and (area_core or provider_<domain> ...)"`, on the listed players plus `slim-1` for `core`.
-- `--all`: a gate over everything, `-m gate`: every area and every journey, on every area's roles plus one player of each kind.
+- Player providers without `--areas`, `--all` or `--deep`: a gate over `core` and each provider's journey, `-m "gate and (area_core or provider_<domain> ...)"`, on the listed players plus `slim-1` for `core`, plus the roles a journey needs next to its player (`JOURNEY_ROLES`: `sendspin` adds `sendspin-2` and the visualizer `sendspinviz-1`).
+- `--all`: a gate over everything, `-m gate`: every area and every journey, on every area's roles plus one player of each kind and the journeys' roles.
 - Music providers: one music run per account set (`-m music`), one after another, each under its own lease, on the first listed player provider or `sendspin-1`. No rerun.
 - Devices: one bench run, see Hardware.
-- `--deep`: the daily deep run: one run with `-m deep` on every deep role (`DEEP_ROLES`, two of slim, snap and sendspin) or the listed player providers, then one music run per frozen account set in name order, each on `sendspin-1` under its own lease. A music run that collects nothing (5) counts as 0.
+- `--deep`: the daily deep run: one run with `-m deep` on every deep role (`DEEP_ROLES`, two of slim, snap and sendspin, and the Sendspin visualizer) or the listed player providers, then one music run per frozen account set in name order, each on `sendspin-1` under its own lease. A music run that collects nothing (5) counts as 0.
 - Nothing of the above: a smoke run, `-m smoke`, no rerun.
 
 With a music provider in the list the players are only its stage: `--providers squeezelite,spotify` runs Spotify on `slim-1`, no squeezelite gate. `--areas`, `--all` and `--deep` exclude each other, `--deep` refuses `--keep`, `--deep` and `--all` take no music providers or devices, `--areas` takes no devices, and devices go only with `sendspin` players. Several runs exit with the worst exit code; each prints its own id.
@@ -349,7 +349,7 @@ ssh lab 'journalctl -u lab-gc'
 ssh lab 'docker ps'              # leftover lab-<run id> projects point at forgotten --keep runs
 ```
 
-Images. The server image `lab/ma:<tag>` is rebuilt by every `lab run` with `--pull`, so a tag-only base such as `server:stable` moves to its latest release; it is a cached no-op unless the base or `images/ma/entrypoint.sh` changed. The players image is not: rebuild it after a change to `images/players/` (its first stage builds snapclient 0.31 from source with `snapclient-file-player-alive.patch`, see the Dockerfile; drop the stage once the snapclient package the image installs carries the fix), to `labctl/pacer.py` or `labctl/sendspin_client.py`, or to the dependencies in `pyproject.toml` (the tests run from the venv baked into it), otherwise the old code runs (the first AirPlay run after a pacer change died on a missing FIFO). Scenarios and `labctl` are copied from the synced repo into the run's `src/` when the run is created and need no rebuild.
+Images. The server image `lab/ma:<tag>` is rebuilt by every `lab run` with `--pull`, so a tag-only base such as `server:stable` moves to its latest release; it is a cached no-op unless the base or `images/ma/entrypoint.sh` changed. The players image is not: rebuild it after a change to `images/players/` (its first stage builds snapclient 0.31 from source with `snapclient-file-player-alive.patch`, see the Dockerfile; drop the stage once the snapclient package the image installs carries the fix), to `labctl/pacer.py` or `labctl/sendspin_client.py`, or to the dependencies in `pyproject.toml` (the tests run from the venv baked into it), otherwise the old code runs (the first AirPlay run after a pacer change died on a missing FIFO). Scenarios and `labctl` are copied from the synced repo into the run's `src/` when the run is created and need no rebuild. To try a players image change without replacing `lab/players:latest`, which other runs use, build it under another tag and start the run with `LAB_PLAYERS_IMAGE=<tag>` in labctl's environment.
 
 Nightly digest. The nightly image is pinned in `[images] nightly` in `/srv/lab/src/config/lab.toml`. To move it, pull the tag, read the digest, edit the line, then prewarm:
 

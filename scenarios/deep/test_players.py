@@ -17,6 +17,7 @@ from scenarios.checks.players import (
     group_plays_in_sync,
     group_skip_intact,
     group_volume_average,
+    leader_removed_with_visualizer_keeps_playing,
     member_rejoins,
     member_removed_keeps_leader,
     member_restart_ungroups,
@@ -66,6 +67,13 @@ async def test_group_announce_restores(role: str, ctx: CheckContext) -> None:
 async def test_member_rejoins(role: str, ctx: CheckContext) -> None:
     """A restarted static syncgroup member drops out, returns and rejoins the playing group."""
     await member_rejoins(ctx, role)
+
+
+# the only kind with a visualizer-only client in the lab
+@pytest.mark.roles("sendspin-1")
+async def test_leader_removed_with_visualizer_keeps_playing(role: str, ctx: CheckContext) -> None:
+    """Removing the syncgroup leader keeps the next speaker playing when a visualizer is next."""
+    await leader_removed_with_visualizer_keeps_playing(ctx, role)
 
 
 @needs_docker

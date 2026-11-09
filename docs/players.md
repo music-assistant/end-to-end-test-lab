@@ -34,6 +34,17 @@ analyzer's peak for the tone segment. The mpd "after stop" is from 2026-10-29 wi
 builtin `sendspin`, nothing to set up; the client is auto-trusted through unpaired access. The
 player has no volume control, so bootstrap skips it.
 
+## sendspinviz
+
+`lab-sendspin --role sendspinviz-1 ... --visualizer`: the same client with only the `visualizer`
+role, as Hue Entertainment registers: no player role, no audio, no capture. It advertises
+`visualizer_support` with a 2048-byte buffer and asks for beats, peaks and a 17-bin mel spectrum
+(20 Hz to 20 kHz) at 20 Hz, the values of `hue_entertainment/bridge.py`. MA registers it as a
+`SendspinVisualizerPlayer`, logged as `Player (type visualizer) registered: ...
+/lab-sendspinviz-1`, hidden by default but in `players/all`. It can join a Sendspin syncgroup.
+Not a `--providers` value and not in the smoke run: only the `sendspin` journey and the deep run
+boot it (`JOURNEY_ROLES`, `DEEP_ROLES` in `labctl/areas.py`).
+
 ## airplay
 
 Image `mikebrady/shairport-sync:latest` (5.6.2, AirPlay 2 build, `[images] shairport` in
