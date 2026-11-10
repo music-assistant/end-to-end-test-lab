@@ -558,6 +558,24 @@ def write_summary(
     return summary
 
 
+def prune_captures(run: Run) -> None:
+    """Delete the captures of roles no failed test ran on or read; keep all without junit.xml."""
+    junit = run.dir / "junit.xml"
+    if not junit.exists():
+        return
+    kept: set[str] = set()
+    for node_id, case in testcases(junit).items():
+        if outcome(case) != "fail":
+            continue
+        if node_id.endswith("]"):
+            kept.add(node_id.rsplit("[", 1)[1][:-1])
+        props = case.iter("property")
+        kept.update(prop.get("value", "") for prop in props if prop.get("name") == "capture")
+    for path in run.captures_dir.iterdir():
+        if path.stem not in kept:
+            path.unlink()
+
+
 def _sendspin_service(run: Run, role: str) -> dict[str, Any]:
     """Headless Sendspin client that writes its own capture."""
     return {

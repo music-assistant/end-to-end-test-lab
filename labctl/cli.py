@@ -435,6 +435,8 @@ def _test(
         summary = runs.write_summary(
             run, checkout, base_digest, time.monotonic() - started, exit_code
         )
+        if not keep:
+            runs.prune_captures(run)
         click.echo(
             f"run {run.id}: exit {exit_code}, junit {summary['junit']}, "
             f"{summary['duration_s']:.0f} s, output in {run.dir}"

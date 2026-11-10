@@ -294,6 +294,34 @@ def test_failed_checkpoints(tmp_path: Path) -> None:
     }
 
 
+def test_prune_captures(tmp_path: Path) -> None:
+    """Only roles a failed test ran on or read keep their capture files."""
+    run = runs.Run("r1", tmp_path, ())
+    run.captures_dir.mkdir()
+    for role in ("slim-1", "slim-2", "dlna-1", "snap-1"):
+        for suffix in (".pcm", ".stamps", ".json"):
+            (run.captures_dir / f"{role}{suffix}").write_text("")
+    (tmp_path / "junit.xml").write_text(
+        GATE_JUNIT.replace(
+            "<failure/>",
+            '<properties><property name="capture" value="slim-2"/></properties><failure/>',
+        )
+    )
+    runs.prune_captures(run)
+    kept = {path.stem for path in run.captures_dir.iterdir()}
+    assert kept == {"slim-1", "slim-2", "dlna-1"}
+    assert len(list(run.captures_dir.iterdir())) == 9
+
+
+def test_prune_captures_without_junit(tmp_path: Path) -> None:
+    """A run without junit.xml keeps every capture."""
+    run = runs.Run("r1", tmp_path, ())
+    run.captures_dir.mkdir()
+    (run.captures_dir / "slim-1.pcm").write_text("")
+    runs.prune_captures(run)
+    assert (run.captures_dir / "slim-1.pcm").exists()
+
+
 def test_rerun_outcomes() -> None:
     """A rerun test passes on the second try unless it failed again."""
     assert runs.rerun_outcomes(("a", "b"), ("b",)) == [
