@@ -200,12 +200,19 @@ async def players(
 
 
 @pytest.fixture
-def capture(run: LabRun, tones: Manifest) -> CaptureLoader:
+def capture(
+    run: LabRun, tones: Manifest, record_property: Callable[[str, object], None]
+) -> CaptureLoader:
     """Load a role's capture from the test's start as written so far; reread for a fresh view."""
     # a full read grows with the run (about 2 s at 18 min) and blocks the event loop meanwhile
     started = time.time()
+    recorded: set[str] = set()
 
     def load(role: str, since: float | None = None) -> Capture:
+        # lab run keeps the captures of the roles a failed test used
+        if role not in recorded:
+            recorded.add(role)
+            record_property("role", role)
         start = started if since is None else since
         return Capture.load(run.captures_dir, role, tones, since=start)
 

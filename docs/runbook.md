@@ -100,6 +100,8 @@ data/             the server data dir (not in music runs, which use the account 
 music-extra/      not in music runs: writable music folder, /music/extra in the server (the tone library is /music/tones) and /run/music-extra in the tests container
 ```
 
+When pytest finishes (exit 0 or 1), `lab run` deletes the captures of every role no failed or errored test ran on (the `[<role>]` of its node id) or used (its `role` properties, recorded when a check addresses a role or reads its capture), so a green run keeps none. A run that failed before pytest, an interrupted or killed pytest and a `--keep` run keep all of them.
+
 Reading a failed run:
 
 1. Look at `summary.json`. `exit_code: null` and `junit: null` mean the run failed before pytest, and the CLI error says where. Bootstrap waits 180 s for the server, 60 s for the tone library to reach 8 tracks and 60 s for all roles to register (`players missing after 60 s: [...]`).

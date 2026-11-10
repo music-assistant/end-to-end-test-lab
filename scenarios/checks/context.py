@@ -35,6 +35,8 @@ class CheckContext:
     record_property: Callable[[str, object], None]
     # the running check, set by `@check`; qualifies the checkpoint names of its steps
     check: str = ""
+    # roles a test addressed, recorded once each as a `role` property
+    used: set[str] = dataclasses.field(default_factory=set)
 
     @contextlib.asynccontextmanager
     async def reconnect(self, timeout: float) -> AsyncIterator[MusicAssistantClient]:
@@ -49,6 +51,10 @@ class CheckContext:
 
     def player_id(self, role: str) -> str:
         """Return the player id of a role or leased device of the run."""
+        # lab run keeps the captures of the roles a failed test used
+        if role not in self.used:
+            self.used.add(role)
+            self.record_property("role", role)
         return self.players[role]
 
     def step(

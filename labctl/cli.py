@@ -435,6 +435,9 @@ def _test(
         summary = runs.write_summary(
             run, checkout, base_digest, time.monotonic() - started, exit_code
         )
+        # an interrupted pytest leaves no testcase for the test it stopped
+        if not keep and exit_code in (0, 1):
+            runs.prune_captures(run)
         click.echo(
             f"run {run.id}: exit {exit_code}, junit {summary['junit']}, "
             f"{summary['duration_s']:.0f} s, output in {run.dir}"
