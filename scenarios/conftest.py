@@ -209,10 +209,10 @@ def capture(
     recorded: set[str] = set()
 
     def load(role: str, since: float | None = None) -> Capture:
-        # lab run keeps the captures a failed test read
+        # lab run keeps the captures of the roles a failed test used
         if role not in recorded:
             recorded.add(role)
-            record_property("capture", role)
+            record_property("role", role)
         start = started if since is None else since
         return Capture.load(run.captures_dir, role, tones, since=start)
 

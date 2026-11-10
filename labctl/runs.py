@@ -559,18 +559,15 @@ def write_summary(
 
 
 def prune_captures(run: Run) -> None:
-    """Delete the captures of roles no failed test ran on or read; keep all without junit.xml."""
-    junit = run.dir / "junit.xml"
-    if not junit.exists():
-        return
+    """Delete the captures of roles no failed test ran on or used, from a finished run's junit."""
     kept: set[str] = set()
-    for node_id, case in testcases(junit).items():
+    for node_id, case in testcases(run.dir / "junit.xml").items():
         if outcome(case) != "fail":
             continue
         if node_id.endswith("]"):
             kept.add(node_id.rsplit("[", 1)[1][:-1])
         props = case.iter("property")
-        kept.update(prop.get("value", "") for prop in props if prop.get("name") == "capture")
+        kept.update(prop.get("value", "") for prop in props if prop.get("name") == "role")
     for path in run.captures_dir.iterdir():
         if path.stem not in kept:
             path.unlink()

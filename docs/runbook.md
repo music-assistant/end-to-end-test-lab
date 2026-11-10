@@ -100,7 +100,7 @@ data/             the server data dir (not in music runs, which use the account 
 music-extra/      not in music runs: writable music folder, /music/extra in the server (the tone library is /music/tones) and /run/music-extra in the tests container
 ```
 
-At the end of a run `lab run` deletes the captures of every role no failed or errored test ran on (the `[<role>]` of its node id) or read (its `capture` properties), so a green run keeps none. A run without `junit.xml` (failed before pytest, or pytest died) and a `--keep` run keep all of them.
+When pytest finishes (exit 0 or 1), `lab run` deletes the captures of every role no failed or errored test ran on (the `[<role>]` of its node id) or used (its `role` properties, recorded when a check addresses a role or reads its capture), so a green run keeps none. A run that failed before pytest, an interrupted or killed pytest and a `--keep` run keep all of them.
 
 Reading a failed run:
 
