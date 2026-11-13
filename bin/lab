@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Client-side wrapper: sync this repo to the lab VM, then run labctl there.
 set -euo pipefail
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# resolve a symlink on PATH first: this directory is rsynced to the VM with --delete
+REPO_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")/.." && pwd)"
 LAB_SSH_HOST="${LAB_SSH_HOST:-lab}"
 LAB_SRC="${LAB_SRC:-/srv/lab/src}"
 
