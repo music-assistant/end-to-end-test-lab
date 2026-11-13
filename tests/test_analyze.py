@@ -1,6 +1,7 @@
 """Audio oracle tests on synthetic captures."""
 
 import json
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -132,6 +133,40 @@ def test_markers_survive_stamp_jitter(tmp_path: Path) -> None:
     assert capture.markers() == pytest.approx(expected, abs=0.005)
 
 
+def test_one_late_write_is_not_a_gap(tmp_path: Path) -> None:
+    """A write read 6 ms late, with the next ones on cadence, does not cut a hole into a chirp."""
+    _write(tmp_path, "p", [(1.0, _tone("a1t1", 4.0))], total_s=6.0)
+    # write 2 is 0.1 s into the start chirp
+    _split_into_reads(tmp_path, "p", lambda write: 6_000_000 if write == 2 else 0)
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    expected = [capture.start + 1.0, capture.start + 1.0 + 4.0 - MANIFEST.chirp.duration_s]
+    assert capture.markers() == pytest.approx(expected, abs=0.005)
+
+
+def test_cadence_slip_is_a_gap(tmp_path: Path) -> None:
+    """A writer that falls 20 ms behind and stays there moves the rest of the audio 20 ms."""
+    _write(tmp_path, "p", [(1.0, _tone("a1t1", 4.0))], total_s=6.0)
+    # the first slipped write is read another 10 ms late on top
+    _split_into_reads(
+        tmp_path, "p", lambda write: 30_000_000 if write == 40 else 20_000_000 * (write > 40)
+    )
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    expected = [capture.start + 1.0, capture.start + 1.02 + 4.0 - MANIFEST.chirp.duration_s]
+    assert capture.markers() == pytest.approx(expected, abs=0.005)
+
+
+def test_stall_made_up_by_a_burst_is_a_gap(tmp_path: Path) -> None:
+    """A writer stalling 300 ms that then writes its backlog at once leaves a 300 ms gap."""
+    _write(tmp_path, "p", [(1.0, _tone("a1t1", 4.0))], total_s=6.0)
+    # writes 40 to 45 come out together at write 46's time, the ones after on cadence
+    _split_into_reads(
+        tmp_path, "p", lambda write: (46 - write) * 50_000_000 if 40 <= write < 46 else 0
+    )
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    (gap,) = capture.gaps()
+    assert gap.duration == pytest.approx(0.3, abs=2 * WINDOW_S)
+
+
 def test_level_follows_volume(tmp_path: Path) -> None:
     """The level of a span drops 12 dB with the signal and counts only the asked kind."""
     loud = _tone("a1t4", 4.0)
@@ -184,3 +219,16 @@ def _write(
         "ended_wall_ns": BASE_NS + round(total_s * 1e9),
     }
     (directory / f"{role}.json").write_text(json.dumps(meta))
+
+
+def _split_into_reads(directory: Path, role: str, delay_ns: Callable[[int], int]) -> None:
+    """Restamp each write as the pacer's 4096-byte reads, 50 µs apart, delayed per write."""
+    stamps = directory / f"{role}.stamps"
+    lines = []
+    for write, line in enumerate(stamps.read_text().splitlines()):
+        mono, wall, offset, nbytes = (int(field) for field in line.split())
+        for k, start in enumerate(range(0, nbytes, 4096)):
+            shift = delay_ns(write) + k * 50_000
+            size = min(4096, nbytes - start)
+            lines.append(f"{mono + shift} {wall + shift} {offset + start} {size}\n")
+    stamps.write_text("".join(lines))
