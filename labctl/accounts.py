@@ -175,8 +175,7 @@ def freeze(config: LabConfig, name: str, config_file: Path) -> None:
     for pem in data.glob("webrtc_*.pem"):
         pem.unlink()
     settings = json.loads((data / seed.SETTINGS_FILE).read_text())
-    # back to auto: inside a run the server lives on the run's bridge
-    settings["core"]["webserver"]["values"].pop("base_url", None)
+    _reset_login_settings(settings)
     (data / seed.SETTINGS_FILE).write_text(json.dumps(settings, indent=2))
     (directory / seed.TOKEN_FILE).write_text(token)
     meta.unlink()
@@ -228,6 +227,15 @@ def _write_login(
     meta.write_text(json.dumps({"sha": checkout.sha, "ref": checkout.ref, "url": url}) + "\n")
     (directory / COMPOSE_FILE).write_text(yaml.safe_dump(project, sort_keys=False))
     return url
+
+
+def _reset_login_settings(settings: dict[str, Any]) -> None:
+    """Drop what a login instance pinned in `settings`, so runs boot the set on the defaults."""
+    # back to auto: inside a run the server lives on the run's bridge
+    settings["core"]["webserver"]["values"].pop("base_url", None)
+    # a host-network login binds the ports it found free; runs reach the server on MA_PORT
+    for section in ("webserver", "streams"):
+        settings["core"][section]["values"].pop("bind_port", None)
 
 
 async def _login_and_mint(url: str, password: str) -> str:
