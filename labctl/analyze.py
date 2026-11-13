@@ -27,6 +27,11 @@ MARKER_PAIR_S = 0.5
 MARKER_AGREE_S = 0.02
 # write stamps wobble by up to a few ms; a gap that small is jitter, not missing audio
 STAMP_JITTER_S = 0.005
+# a read up to LATE_READ late opens only the gap the writes SETTLE to CONFIRM after it confirm;
+# a longer lag is a stall, even when a catch-up burst makes up for it
+STAMP_LATE_READ_S = 0.05
+STAMP_SETTLE_S = 0.04
+STAMP_CONFIRM_S = 0.25
 
 Samples = npt.NDArray[np.float32]
 
@@ -140,19 +145,14 @@ class Capture:
         frames_total = pcm_path.stat().st_size // frame_bytes
 
         origin_ns = int(meta["started_wall_ns"])
-        placements: list[tuple[int, int, int]] = []
-        jitter = round(STAMP_JITTER_S * rate)
-        end = 0
+        reads: list[tuple[int, int, int]] = []
         for wall_ns, offset, nbytes in _read_stamps(captures_dir / f"{role}.stamps"):
             f0 = offset // frame_bytes
             f1 = min((offset + nbytes) // frame_bytes, frames_total)
-            if f1 <= f0:
-                continue
-            # a pipe can hand over a backlog in one burst: bytes never play before earlier bytes end
-            stamped = round((wall_ns - origin_ns) * rate / 1e9)
-            pos = stamped if stamped - end > jitter else end
-            placements.append((pos, f0, f1))
-            end = pos + f1 - f0
+            if f1 > f0:
+                reads.append((round((wall_ns - origin_ns) * rate / 1e9), f0, f1))
+        placements = _place_reads(reads, rate)
+        end = placements[-1][0] + placements[-1][2] - placements[-1][1] if placements else 0
 
         # whole windows only, so the trimmed capture keeps the full load's window grid
         first = 0
@@ -314,6 +314,34 @@ def _read_stamps(path: Path) -> list[tuple[int, int, int]]:
     # the last element is "" or a line the pacer is still writing
     lines = path.read_text().split("\n")[:-1]
     return [(int(f[1]), int(f[2]), int(f[3])) for f in (line.split() for line in lines)]
+
+
+def _place_reads(reads: list[tuple[int, int, int]], rate: int) -> list[tuple[int, int, int]]:
+    """Place (stamped frame, f0, f1) reads on the timeline as (position, f0, f1)."""
+    jitter = round(STAMP_JITTER_S * rate)
+    late_read = round(STAMP_LATE_READ_S * rate)
+    settle = round(STAMP_SETTLE_S * rate)
+    confirm = round(STAMP_CONFIRM_S * rate)
+    placements: list[tuple[int, int, int]] = []
+    end = 0
+    for i, (stamped, f0, f1) in enumerate(reads):
+        # a pipe can hand over a backlog in one burst: bytes never play before earlier bytes end
+        lag = stamped - end
+        if jitter < lag <= late_read:
+            # a writer that only fired late is back on its old schedule a write later; only the
+            # first read of a write tells, the reads after it always look early
+            ahead = end + f1 - f0
+            j = i + 1
+            while j < len(reads) and reads[j][0] - stamped <= confirm:
+                first_read = reads[j][0] - reads[j - 1][0] > jitter
+                if first_read and reads[j][0] - stamped >= settle:
+                    lag = min(lag, reads[j][0] - ahead)
+                ahead += reads[j][2] - reads[j][1]
+                j += 1
+        pos = end + lag if lag > jitter else end
+        placements.append((pos, f0, f1))
+        end = pos + f1 - f0
+    return placements
 
 
 def _refine(
