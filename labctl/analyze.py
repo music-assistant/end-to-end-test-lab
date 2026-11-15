@@ -25,13 +25,18 @@ MARKER_THRESHOLD = 0.5
 MARKER_PAIR_S = 0.5
 # markers land within 5 ms of the chirp, so pairs of one offset agree to well within this
 MARKER_AGREE_S = 0.02
+# at a track change two chirps follow each other; a player that dropped frames there to stay in
+# sync has them that much closer than a chirp is long, and both still count
+MARKER_SLACK_S = 0.02
 # write stamps wobble by up to a few ms; a gap that small is jitter, not missing audio
 STAMP_JITTER_S = 0.005
 # a read up to LATE_READ late opens only the gap the writes SETTLE to CONFIRM after it confirm;
-# a longer lag is a stall, even when a catch-up burst makes up for it
-STAMP_LATE_READ_S = 0.05
+# a longer lag is a stall, even when a catch-up burst makes up for it. The pacer makes up for a
+# wake-up up to 121 ms late (its underrun limit, checked one 21 ms read later), and on a busy VM
+# its reads stay late for longer than a quarter of a second
+STAMP_LATE_READ_S = 0.13
 STAMP_SETTLE_S = 0.04
-STAMP_CONFIRM_S = 0.25
+STAMP_CONFIRM_S = 0.5
 
 Samples = npt.NDArray[np.float32]
 
@@ -234,7 +239,8 @@ class Capture:
         # normalised cross-correlation: 1.0 is a lone chirp, independent of playback volume
         ncc = corr / (np.linalg.norm(template) * np.sqrt(local) + 1e-12)
         # padded so a chirp at the very start or end of the capture still counts as a peak
-        peaks, _ = sps.find_peaks(np.pad(ncc, 1), height=MARKER_THRESHOLD, distance=len(template))
+        distance = len(template) - round(MARKER_SLACK_S * self.rate)
+        peaks, _ = sps.find_peaks(np.pad(ncc, 1), height=MARKER_THRESHOLD, distance=distance)
         return [self._time(int(p) - 1) for p in peaks]
 
     def sync_offset(self, other: Capture) -> float | None:

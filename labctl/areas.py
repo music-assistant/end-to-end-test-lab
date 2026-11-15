@@ -13,6 +13,7 @@ AREA_ROLES: dict[str, tuple[str, ...]] = {
     "queue": ("airplay-1", "dlna-1", "slim-1", "snap-1", "sendspin-1"),
     "streams": ("slim-1", "sendspin-1"),
     "players": ("slim-1", "slim-2"),
+    "bridge": ("slim-1", "slim-2", "sendspin-1"),
     "library": ("slim-1",),
 }
 # MA provider domain per virtual player kind; --providers takes the domain or the kind

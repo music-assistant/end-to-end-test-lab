@@ -90,6 +90,20 @@ squeezelite only resamples to a multiple of the source rate unless `X` (async) i
 Provider: `squeezelite` (`config/providers/setup`, no values). The player connects to `ma:3483`
 itself; MA takes the name from `-n`.
 
+The capture trails the position squeezelite reports by 384.0 to 405.3 ms. Its stdout output
+reports no device delay: it counts a frame as played when the write before it returned
+(`output_stdout.c`), which is when the pacer took a page out of the full 64 KiB FIFO. That frame
+is stamped 18 pacer reads later (the 16 pages of the FIFO, the page the pacer holds, and its stamp
+at the end of the wait: 18 x 21.33 ms = 384 ms), plus what sat in front of it in squeezelite's
+4096 byte stdio buffer, which is where its stream began within a page (0 to 21.3 ms, fixed for a
+stream). Two squeezelite roles share the delay and differ by their page offsets. Against a role
+that is stamped at its play-at time, such as `sendspin-1`, a squeezelite role that plays in sync
+lags by that delay: the `bridge` checks expect it (`FIFO_DELAY_S` in `scenarios/checks/bridge.py`).
+Measured on 8 starts of a squeezelite player bridged into a Sendspin group (run
+20261115-053044-fae1): 384.1 to 404.2 ms, each within 1.1 ms of 384 ms plus the page offset read
+from the capture. A stream at another rate than 48 kHz is 1 dB quieter, the default attenuation
+of squeezelite's resampler (`-R`).
+
 ## snap
 
 `snapclient --player file:filename=/fifo/pcm --hostID lab-snap-1 -h ma`, container `hostname:
