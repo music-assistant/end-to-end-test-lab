@@ -49,6 +49,7 @@ markers = [
     "area_queue: gate area queue",
     "area_streams: gate area streams",
     "area_players: gate area players",
+    "area_bridge: gate area bridge",
     "area_library: gate area library",
     "provider_sendspin: gate journey of the sendspin player provider",
     "provider_airplay: gate journey of the airplay player provider",

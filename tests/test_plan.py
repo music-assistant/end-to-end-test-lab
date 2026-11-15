@@ -59,7 +59,7 @@ def test_all() -> None:
     """Everything marked gate, on every area's roles plus one of each kind."""
     [spec] = specs(all_areas=True, keep=True)
     assert (spec.purpose, spec.marker, spec.rerun) == ("all dev keep", "gate", True)
-    assert spec.areas == ("core", "queue", "streams", "players", "library")
+    assert spec.areas == ("core", "queue", "streams", "players", "bridge", "library")
     assert set(spec.roles) >= set(ALL_KINDS)
 
 

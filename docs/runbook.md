@@ -43,7 +43,7 @@ lab run --ref <ref> [--providers <list>] [--areas <areas> | --all | --deep] [-k 
   - a virtual player provider by its Music Assistant domain: `sendspin`, `airplay`, `dlna`, `squeezelite`, `snapcast`, `mpd` (`slim` and `snap` work too). Repeat one for more players of it: `squeezelite,squeezelite` gives `slim-1` and `slim-2`. Each role shows up in Music Assistant as `lab-<role>`. Without any, a run gets one of each.
   - a music provider by its domain: `spotify`, `apple_music`, `tidal`, `ytmusic`, `qobuz`, `deezer`. It resolves to the frozen account set of that provider (`spotify` is `spotify-a`) and fails when there is none or more than one; a set name such as `spotify-a` works as well.
   - a bench device id from `[devices]` (`sonos-1`), or `devices` for every registered one; see Hardware.
-- `--areas` is a comma-separated list of gate areas (`AREA_ROLES` in `labctl/areas.py`: `core`, `queue`, `streams`, `players`, `library`).
+- `--areas` is a comma-separated list of gate areas (`AREA_ROLES` in `labctl/areas.py`: `core`, `queue`, `streams`, `players`, `bridge`, `library`).
 - `-k` is a pytest `-k` expression. It narrows whichever mode the other flags picked; the smoke test only runs when nothing is listed. The smoke run has the smoke test, parametrized over every role; music runs have `continuity`, `external_pause`, `last_track_ends_clean` and `provider_reload`, see Account sets.
 - `--keep` leaves the run up instead of tearing it down and keeps its lease as a hold, see below.
 

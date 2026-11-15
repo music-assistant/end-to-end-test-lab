@@ -22,6 +22,7 @@ players the areas run on.
 | `helpers/hls.py` | `music:bbc_sounds`, `music:nicovideo` (no lab area) |
 | `providers/sync_group/**`, `providers/universal_group/**`, `providers/universal_player/**`, `controllers/config/players.py` | `players` |
 | `providers/squeezelite/multi_client_stream.py` | `--providers squeezelite`, `streams` |
+| `providers/squeezelite/sendspin_bridge.py`, `providers/squeezelite/bridge_sync.py` | `--providers squeezelite`, `bridge` |
 | `providers/snapcast/ma_stream.py` | `--providers snapcast`, `streams` |
 | `providers/sendspin/playback.py` | `--providers sendspin`, `streams` |
 | `providers/airplay/stream.py` | `--providers airplay` |
@@ -76,6 +77,7 @@ silent and resumes near where it paused, whether the player pauses in place or s
 - `queue`: `album_plays_through`, `resume_advances`, `now_playing_follows` on airplay, dlna, slim, snap and sendspin.
 - `streams`: `flow_continuous`, `flow_next_skips_one`, `crossfade_overlap`, `seek_resumes`, `elapsed_tracks_pause`, `stop_after_end_position`, `short_file_plays`, `radio_start_latency`, `radio_icy_plays`, `radio_hls_plays`, `radio_403_rejected` on slim and sendspin.
 - `players`: group, announce, volume and pause checks on `slim-1` and `slim-2`.
+- `bridge`: `bridge_output_listed`, `mixed_group_plays_in_sync`, `bridge_member_joins_and_leaves`, `mixed_group_stops_and_ends` on `slim-1` grouped with `sendspin-1`, and `squeezelite_group_stays_native` on `slim-1` with `slim-2`.
 - `library`: `scan_matches_manifest`, `rows_survive_restart`.
 - `--providers <domain>`: album, resume, next drops the previous track, volume when the player advertises it, and announce on that provider's one role (`gate/test_player_kind.py`, marker `provider_<domain>`, area `<domain>` in `lab summary`).
 
