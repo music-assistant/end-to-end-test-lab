@@ -9,6 +9,7 @@ import aiohttp
 from music_assistant_client import MusicAssistantClient
 
 from labctl.devices import DEVICE_VOLUME, Device, matches
+from labctl.protocols import player_of_protocol, protocol_id, protocol_key
 from labctl.runs import MPD_PORT, role_kind
 
 READY_TIMEOUT_S = 180.0
@@ -105,12 +106,13 @@ async def _name_mpd_players(client: MusicAssistantClient, roles: tuple[str, ...]
         async with asyncio.timeout(PLAYERS_TIMEOUT_S):
             while wanted:
                 players: list[dict[str, Any]] = await client.send_command("players/all")
-                for player_id in wanted.keys() & {p["player_id"] for p in players}:
-                    await client.send_command(
-                        "config/players/save",
-                        player_id=player_id,
-                        values={"name": wanted.pop(player_id)},
-                    )
+                for mpd_id in list(wanted):
+                    if player := player_of_protocol(players, mpd_id):
+                        await client.send_command(
+                            "config/players/save",
+                            player_id=player["player_id"],
+                            values={"name": wanted.pop(mpd_id)},
+                        )
                 await asyncio.sleep(POLL_S)
     except TimeoutError:
         msg = f"MPD players not registered after {PLAYERS_TIMEOUT_S:.0f} s: {sorted(wanted)}"
@@ -189,14 +191,10 @@ async def _prepare_players(
         # a real AirPlay device such as a HomePod keeps native AirPlay 2
         if player_key not in roles or role_kind(player_key) != "airplay":
             continue
-        # the setting lives on the AirPlay protocol player behind the universal player
-        [protocol_id] = [
-            output["output_protocol_id"]
-            for output in player["output_protocols"]
-            if output["protocol_domain"] == "airplay"
-        ]
+        # the setting belongs to the player's AirPlay protocol
+        airplay_key = protocol_key(protocol_id(player, "airplay"), "streaming_mode")
         await client.send_command(
             "config/players/save",
-            player_id=protocol_id,
-            values={"streaming_mode": AIRPLAY_STREAMING_MODE},
+            player_id=player["player_id"],
+            values={airplay_key: AIRPLAY_STREAMING_MODE},
         )
