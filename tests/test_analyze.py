@@ -116,6 +116,27 @@ def test_sync_offset_without_first_marker(tmp_path: Path, lag: float, expected: 
     assert a.sync_offset(b) == pytest.approx(expected, abs=0.005)
 
 
+@pytest.mark.parametrize("dropped", [1, 48])
+def test_boundary_markers_survive_dropped_frames(tmp_path: Path, dropped: int) -> None:
+    """A player that drops frames at a track change to stay in sync keeps both boundary markers."""
+    gapless = np.concatenate([_tone("a1t1", 4.0), _tone("a1t2", 4.0)])[: 7 * 48000]
+    # at the very end of track 1: its end marker stays where it is, track 2's start marker
+    # comes that many frames sooner
+    cut = 4 * 48000 - 240
+    corrected = np.delete(gapless, slice(cut, cut + dropped))
+    _write(tmp_path, "a", [(1.0, gapless)], total_s=10.0)
+    _write(tmp_path, "b", [(1.1, corrected)], total_s=10.0)
+    a = Capture.load(tmp_path, "a", MANIFEST)
+    b = Capture.load(tmp_path, "b", MANIFEST)
+    first, second = b.markers()[1:]
+    assert round((second - first) * 48000) == 9600 - dropped
+    # past the start marker, as the in_sync checks read it
+    since = a.start + 3.0
+    assert Capture.load(tmp_path, "a", MANIFEST, since=since).sync_offset(
+        Capture.load(tmp_path, "b", MANIFEST, since=since)
+    ) == pytest.approx(0.1, abs=0.005)
+
+
 def test_markers_survive_stamp_jitter(tmp_path: Path) -> None:
     """Sub-millisecond jitter on write stamps does not cut gaps into a chirp."""
     _write(tmp_path, "p", [(1.0, _tone("a1t1", 4.0))], total_s=6.0)
