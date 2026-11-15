@@ -31,10 +31,12 @@ MARKER_SLACK_S = 0.02
 # write stamps wobble by up to a few ms; a gap that small is jitter, not missing audio
 STAMP_JITTER_S = 0.005
 # a read up to LATE_READ late opens only the gap the writes SETTLE to CONFIRM after it confirm;
-# a longer lag is a stall, even when a catch-up burst makes up for it
-STAMP_LATE_READ_S = 0.05
+# a longer lag is a stall, even when a catch-up burst makes up for it. The pacer makes up for a
+# wake-up up to 121 ms late (its underrun limit, checked one 21 ms read later), and on a busy VM
+# its reads stay late for longer than a quarter of a second
+STAMP_LATE_READ_S = 0.13
 STAMP_SETTLE_S = 0.04
-STAMP_CONFIRM_S = 0.25
+STAMP_CONFIRM_S = 0.5
 
 Samples = npt.NDArray[np.float32]
 

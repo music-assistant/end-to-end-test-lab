@@ -1,7 +1,7 @@
 """Audio oracle tests on synthetic captures."""
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 from pathlib import Path
 
@@ -12,6 +12,7 @@ from scipy.signal import resample_poly
 
 from labctl.analyze import Capture, Manifest
 from labctl.config import REPO_ROOT
+from labctl.pacer import READ_BYTES, CaptureWriter, RateLimiter, pump
 from scenarios.checks.queue import HEAR_LEAD_S, starts_after
 from tones.generate import synthesize
 
@@ -188,6 +189,23 @@ def test_stall_made_up_by_a_burst_is_a_gap(tmp_path: Path) -> None:
     assert gap.duration == pytest.approx(0.3, abs=2 * WINDOW_S)
 
 
+def test_wake_up_the_pacer_makes_up_for_is_not_a_gap(tmp_path: Path) -> None:
+    """A pacer that wakes 120 ms late and reads its backlog at once leaves the audio in place."""
+    # read 10 is 0.2 s in, well before the tone
+    _pace(tmp_path, "p", _idle_then_tone(), {10: 120_000_000})
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    expected = [capture.start + 1.0, capture.start + 1.0 + 4.0 - MANIFEST.chirp.duration_s]
+    assert capture.markers() == pytest.approx(expected, abs=0.005)
+
+
+def test_pacer_late_for_a_while_is_not_a_gap(tmp_path: Path) -> None:
+    """A pacer that wakes 10 ms late for a third of a second leaves the audio in place."""
+    _pace(tmp_path, "p", _idle_then_tone(), dict.fromkeys(range(10, 26), 10_000_000))
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    expected = [capture.start + 1.0, capture.start + 1.0 + 4.0 - MANIFEST.chirp.duration_s]
+    assert capture.markers() == pytest.approx(expected, abs=0.005)
+
+
 def test_level_follows_volume(tmp_path: Path) -> None:
     """The level of a span drops 12 dB with the signal and counts only the asked kind."""
     loud = _tone("a1t4", 4.0)
@@ -240,6 +258,43 @@ def _write(
         "ended_wall_ns": BASE_NS + round(total_s * 1e9),
     }
     (directory / f"{role}.json").write_text(json.dumps(meta))
+
+
+def _idle_then_tone() -> npt.NDArray[np.float64]:
+    """Return what an idle player writes around a 4 s tone: 1 s of silence, the tone, silence."""
+    return np.concatenate([np.zeros(48000), _tone("a1t1", 4.0), np.zeros(24000)])
+
+
+def _pace(
+    directory: Path, role: str, signal: npt.NDArray[np.float64], late_ns: dict[int, int]
+) -> None:
+    """Write a capture through the pacer, which oversleeps by `late_ns[read]` before a read."""
+    now = [10**9]
+    read = [0]
+    pcm = np.repeat(np.round(signal * 32767).astype("<i2"), 2).tobytes()
+
+    def clock() -> int:
+        return now[0]
+
+    def sleep(seconds: float) -> None:
+        now[0] += round(seconds * 1e9) + late_ns.get(read[0], 0)
+
+    def reads() -> Iterator[bytes]:
+        for start in range(0, len(pcm), READ_BYTES):
+            read[0] = start // READ_BYTES
+            yield pcm[start : start + READ_BYTES]
+
+    writer = CaptureWriter(
+        role,
+        directory,
+        48000,
+        2,
+        container_started_wall_ns=BASE_NS,
+        monotonic_ns=clock,
+        wall_ns=lambda: BASE_NS + now[0],
+    )
+    pump(reads(), writer, RateLimiter(192000, monotonic_ns=clock, sleep=sleep))
+    writer.close()
 
 
 def _split_into_reads(directory: Path, role: str, delay_ns: Callable[[int], int]) -> None:
