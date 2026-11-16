@@ -62,9 +62,15 @@ class CaptureWriter:
         """Bytes written so far."""
         return self._offset
 
-    def write(self, data: bytes) -> None:
-        """Append data to the capture and stamp the write."""
-        self._stamps.write(f"{self._monotonic_ns()} {self._wall_ns()} {self._offset} {len(data)}\n")
+    def write(self, data: bytes, wall_ns: int | None = None) -> None:
+        """Append data to the capture, stamped at wall_ns (wall-clock ns), or now when omitted."""
+        monotonic_ns = self._monotonic_ns()
+        now_wall_ns = self._wall_ns()
+        if wall_ns is None:
+            wall_ns = now_wall_ns
+        # both fields describe the same instant
+        monotonic_ns += wall_ns - now_wall_ns
+        self._stamps.write(f"{monotonic_ns} {wall_ns} {self._offset} {len(data)}\n")
         self._pcm.write(data)
         self._offset += len(data)
         # flushed per write so a killed container still leaves a consistent capture

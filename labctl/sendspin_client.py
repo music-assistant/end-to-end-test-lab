@@ -7,6 +7,8 @@ import asyncio
 import hashlib
 import logging
 import signal
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 from aiohttp import ClientError
@@ -33,11 +35,18 @@ BUFFER_CAPACITY = 1024 * 1024
 class SendspinCapture:
     """Writes every audio chunk a Sendspin client receives at its play-at time."""
 
-    def __init__(self, client: SendspinClient, writer: CaptureWriter) -> None:
+    def __init__(
+        self,
+        client: SendspinClient,
+        writer: CaptureWriter,
+        *,
+        wall_ns: Callable[[], int] = time.time_ns,
+    ) -> None:
         """Attach to the client's audio, clear and end events."""
         self._client = client
         self._writer = writer
-        self._queue: asyncio.Queue[tuple[int, int, bytes]] = asyncio.Queue()
+        self._wall_ns = wall_ns
+        self._queue: asyncio.Queue[tuple[int, int, int, bytes]] = asyncio.Queue()
         # bumped on clear and end, so chunks queued or sleeping before it are discarded
         self._generation = 0
         client.add_audio_chunk_listener(self._on_audio_chunk)
@@ -48,21 +57,24 @@ class SendspinCapture:
     async def run(self) -> None:
         """Write queued chunks as their play-at time arrives, until cancelled."""
         while True:
-            generation, server_timestamp_us, payload = await self._queue.get()
+            generation, server_timestamp_us, arrived_wall_ns, payload = await self._queue.get()
             if generation != self._generation:
                 continue
             # converted at write time so the latest clock sync estimate applies
             delay_us = self._client.compute_play_time(server_timestamp_us) - self._client.now_us()
+            # stamped at play-at, so a late wake-up here does not move the audio; a chunk that
+            # arrived after its play-at time is stamped at arrival and still shows late
+            stamp_ns = max(self._wall_ns() + delay_us * 1000, arrived_wall_ns)
             if delay_us > 0:
                 await asyncio.sleep(delay_us / 1e6)
             if generation == self._generation:
-                self._writer.write(payload)
+                self._writer.write(payload, stamp_ns)
 
     def _on_audio_chunk(
         self, server_timestamp_us: int, payload: bytes, audio_format: AudioFormat, send_ahead: int
     ) -> None:
-        """Queue a chunk with its server play-at timestamp."""
-        self._queue.put_nowait((self._generation, server_timestamp_us, payload))
+        """Queue a chunk with its server play-at timestamp and arrival time."""
+        self._queue.put_nowait((self._generation, server_timestamp_us, self._wall_ns(), payload))
 
     def _on_stop(self, roles: list[str] | None) -> None:
         """Discard everything not yet written."""

@@ -1,8 +1,12 @@
 """Audio oracle tests on synthetic captures."""
 
+import asyncio
+import heapq
 import json
 from collections.abc import Callable, Iterator
+from contextlib import suppress
 from dataclasses import replace
+from itertools import count
 from pathlib import Path
 
 import numpy as np
@@ -206,6 +210,45 @@ def test_pacer_late_for_a_while_is_not_a_gap(tmp_path: Path) -> None:
     assert capture.markers() == pytest.approx(expected, abs=0.005)
 
 
+async def test_sendspin_capture_stamps_play_at_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 250 ms late wake-up leaves the audio in place; chunks sent after play-at show late."""
+    sendspin_client = pytest.importorskip("labctl.sendspin_client")
+    clock = _VirtualClock(late_ns={10: 250_000_000})
+    monkeypatch.setattr(asyncio, "sleep", clock.sleep)
+    client = _FakeSendspinClient(clock)
+    writer = CaptureWriter(
+        "p",
+        tmp_path,
+        48000,
+        2,
+        container_started_wall_ns=BASE_NS,
+        monotonic_ns=lambda: clock.now,
+        wall_ns=lambda: BASE_NS + clock.now,
+    )
+    capture_task = asyncio.create_task(
+        sendspin_client.SendspinCapture(client, writer, wall_ns=lambda: BASE_NS + clock.now).run()
+    )
+    pcm = np.repeat(np.round(_idle_then_tone() * 32767).astype("<i2"), 2).tobytes()
+    chunk_bytes = 2400 * 4
+    for i, start in enumerate(range(0, len(pcm), chunk_bytes)):
+        play_ns = 500_000_000 + i * 50_000_000
+        # sent 200 ms ahead, until the server falls 30 ms behind from 3.5 s on
+        await clock.advance_to(play_ns + (30_000_000 if i >= 60 else -200_000_000))
+        client.deliver(play_ns // 1000, pcm[start : start + chunk_bytes])
+        await clock.settle()
+    await clock.advance_to(10**10)
+    capture_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await capture_task
+    writer.close()
+
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    expected = [capture.start + 1.5, capture.start + 1.53 + 4.0 - MANIFEST.chirp.duration_s]
+    assert capture.markers() == pytest.approx(expected, abs=0.005)
+
+
 def test_level_follows_volume(tmp_path: Path) -> None:
     """The level of a span drops 12 dB with the signal and counts only the asked kind."""
     loud = _tone("a1t4", 4.0)
@@ -308,3 +351,62 @@ def _split_into_reads(directory: Path, role: str, delay_ns: Callable[[int], int]
             size = min(4096, nbytes - start)
             lines.append(f"{mono + shift} {wall + shift} {offset + start} {size}\n")
     stamps.write_text("".join(lines))
+
+
+class _VirtualClock:
+    """Monotonic ns clock that `asyncio.sleep` advances, oversleeping by `late_ns[call]`."""
+
+    def __init__(self, late_ns: dict[int, int]) -> None:
+        self.now = 0
+        self._late_ns = late_ns
+        self._calls = count()
+        self._sleepers: list[tuple[int, int, asyncio.Future[None]]] = []
+        self._yield = asyncio.sleep
+
+    async def sleep(self, seconds: float) -> None:
+        call = next(self._calls)
+        wake = self.now + round(seconds * 1e9) + self._late_ns.get(call, 0)
+        future = asyncio.get_running_loop().create_future()
+        heapq.heappush(self._sleepers, (wake, call, future))
+        await future
+
+    async def advance_to(self, ns: int) -> None:
+        """Wake every sleeper due by ns in order, then set the clock to ns."""
+        while self._sleepers and self._sleepers[0][0] <= ns:
+            wake, _, future = heapq.heappop(self._sleepers)
+            self.now = wake
+            future.set_result(None)
+            await self.settle()
+        self.now = max(self.now, ns)
+
+    async def settle(self) -> None:
+        """Let woken tasks run until they block again."""
+        for _ in range(3):
+            await self._yield(0)
+
+
+class _FakeSendspinClient:
+    """Sendspin client whose server clock is the virtual clock in µs."""
+
+    def __init__(self, clock: _VirtualClock) -> None:
+        self._clock = clock
+        self._on_chunk: Callable[..., None] | None = None
+
+    def add_audio_chunk_listener(self, callback: Callable[..., None]) -> None:
+        self._on_chunk = callback
+
+    def add_stream_clear_listener(self, callback: Callable[..., None]) -> None:
+        pass
+
+    def add_stream_end_listener(self, callback: Callable[..., None]) -> None:
+        pass
+
+    def compute_play_time(self, server_timestamp_us: int) -> int:
+        return server_timestamp_us
+
+    def now_us(self) -> int:
+        return self._clock.now // 1000
+
+    def deliver(self, play_us: int, payload: bytes) -> None:
+        assert self._on_chunk is not None
+        self._on_chunk(play_us, payload, None, 0)
