@@ -1,8 +1,8 @@
 [Unit]
-Description=Daily lab garbage collection
+Description=Hourly lab garbage collection
 
 [Timer]
-OnCalendar=daily
+OnCalendar=hourly
 Persistent=true
 
 [Install]

@@ -158,9 +158,16 @@ def logs(config: LabConfig, run_id: str) -> None:
 # the lab-gc timer runs it, not people
 @cli.command(hidden=True)
 @click.option("--days", type=int, required=True, help="Delete runs older than this.")
+@click.option(
+    "--min-free-gb",
+    type=float,
+    default=0,
+    show_default=True,
+    help="Then delete the oldest finished runs until the disk has this much free.",
+)
 @click.pass_obj
-def gc(config: LabConfig, days: int) -> None:
-    """Delete old runs and the worktrees no remaining run uses."""
+def gc(config: LabConfig, days: int, min_free_gb: float) -> None:
+    """Delete old runs, runs that take room the disk needs, and the worktrees none uses."""
     cutoff = time.time() - days * 86400
     run_dirs = list(config.runs_dir.iterdir()) if config.runs_dir.exists() else []
     for run_dir in run_dirs:
@@ -169,6 +176,9 @@ def gc(config: LabConfig, days: int) -> None:
             runs.chown_to_me(run_dir)
             shutil.rmtree(run_dir)
             click.echo(f"removed run {run_dir.name}")
+    if min_free_gb > 0:
+        for run_id in runs.prune_for_space(config, int(min_free_gb * 1_000_000_000)):
+            click.echo(f"removed run {run_id} to free disk space")
     if not config.refs_dir.exists():
         return
     # under the refs lock, a checkout's run.json exists before its worktree is visible here
