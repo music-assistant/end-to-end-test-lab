@@ -31,6 +31,8 @@ RADIO_PORT = 8000
 STOP_TIMEOUT_S = 10
 # watchdog over the whole tests container; a deep run takes about 45 min
 TESTS_TIMEOUT_S = 2 * 3600
+# how long a run stays untouched by prune_for_space after its last change
+PRUNE_MIN_AGE_S = 3600
 CLIAIRPLAY_DIR = "music_assistant/providers/airplay/bin"
 # every non-Sendspin player writes 48 kHz 16-bit stereo into this FIFO; its pacer reads it
 FIFO = "/fifo/pcm"
@@ -424,6 +426,32 @@ def ma_url(run: Run, config: LabConfig) -> str:
 def is_up(run: Run) -> bool:
     """Return whether the run's compose project still has containers."""
     return bool(_compose(run, "ps", "-a", "-q").strip())
+
+
+def prune_for_space(config: LabConfig, min_free_bytes: int) -> list[str]:
+    """Delete the oldest finished runs until `min_free_bytes` are free; return their ids.
+
+    A run that is up, or that changed within the last hour, stays.
+    """
+    removed: list[str] = []
+    if not config.runs_dir.exists():
+        return removed
+    # a run that changed this recently may still be starting, before its containers exist
+    cutoff = time.time() - PRUNE_MIN_AGE_S
+    # run ids start with their UTC creation time, so the names sort oldest first
+    for run_dir in sorted(path for path in config.runs_dir.iterdir() if path.is_dir()):
+        if shutil.disk_usage(config.runs_dir).free >= min_free_bytes:
+            break
+        if run_dir.stat().st_mtime >= cutoff:
+            continue
+        run = Run(run_dir.name, run_dir, ())
+        if run.compose_file.exists() and is_up(run):
+            continue
+        # a kept or failed run still has root-owned files from its containers
+        chown_to_me(run_dir)
+        shutil.rmtree(run_dir)
+        removed.append(run_dir.name)
+    return removed
 
 
 def run_tests(run: Run) -> int:

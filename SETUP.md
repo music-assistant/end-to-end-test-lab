@@ -217,7 +217,7 @@ agent (enabled only under QEMU or KVM); installs `deploy/daemon.json` (run bridg
 logs capped); adds `lab` to the docker group; creates the `/srv/lab` tree (`runs refs golden
 accounts music/tones cache secrets`, secrets mode 0700); builds the labctl venv at
 `/srv/lab/src/.venv` with the `test` and `scenarios` extras; installs and enables `labd.service`
-(lease broker) and `lab-gc.timer` (daily cleanup). `labd` restart-loops until the config exists,
+(lease broker) and `lab-gc.timer` (hourly cleanup). `labd` restart-loops until the config exists,
 which the next step fixes.
 
 ## 6. Lab configuration

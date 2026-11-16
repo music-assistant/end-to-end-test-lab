@@ -6,4 +6,4 @@ ConditionPathExists=/srv/lab/src/.venv/bin/labctl
 Type=oneshot
 User=lab
 Environment=LAB_CONFIG=/srv/lab/src/config/lab.toml
-ExecStart=/srv/lab/src/.venv/bin/labctl gc --days 14
+ExecStart=/srv/lab/src/.venv/bin/labctl gc --days 14 --min-free-gb 10

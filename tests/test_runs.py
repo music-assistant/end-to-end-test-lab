@@ -1,7 +1,10 @@
 """Compose rendering and run summary totals."""
 
 import dataclasses
+import os
+import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -365,3 +368,70 @@ def test_load_devices(config: LabConfig) -> None:
     run = runs.create(config, checkout, ("sendspin-1",), devices=("sonos-1",))
     runs.write_compose(run, runs.render_compose(run, config, Path("/wt"), "img", "tok", SMOKE))
     assert runs.load(config, run.id).devices == ("sonos-1",)
+
+
+GB = 1_000_000_000
+
+
+def _old_run(config: LabConfig, name: str, *, compose: bool = False) -> Path:
+    """Create a run directory last changed two hours ago."""
+    run_dir = config.runs_dir / name
+    run_dir.mkdir(parents=True)
+    if compose:
+        (run_dir / "compose.yml").write_text("services: {}\n")
+    stamp = time.time() - 7200
+    os.utime(run_dir, (stamp, stamp))
+    return run_dir
+
+
+def _disk(monkeypatch: pytest.MonkeyPatch, config: LabConfig, size_gb: int) -> None:
+    """Fake a disk of `size_gb` GB on which every run directory takes 1 GB."""
+
+    def usage(_path: object) -> SimpleNamespace:
+        return SimpleNamespace(free=(size_gb - len(list(config.runs_dir.iterdir()))) * GB)
+
+    monkeypatch.setattr(runs.shutil, "disk_usage", usage)
+    monkeypatch.setattr(runs, "chown_to_me", lambda _path: None)
+
+
+def test_prune_for_space_deletes_the_oldest_finished_runs(
+    config: LabConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Runs go oldest first until the disk has room; a run that is up and a fresh one stay."""
+    for name in ("20261101-000000-aaaa", "20261103-000000-cccc", "20261104-000000-dddd"):
+        _old_run(config, name)
+    _old_run(config, "20261102-000000-bbbb", compose=True)
+    (config.runs_dir / "20261105-000000-eeee").mkdir()
+    monkeypatch.setattr(runs, "is_up", lambda run: run.dir.name == "20261102-000000-bbbb")
+    _disk(monkeypatch, config, size_gb=5)
+
+    removed = runs.prune_for_space(config, 2 * GB)
+
+    assert removed == ["20261101-000000-aaaa", "20261103-000000-cccc"]
+    assert sorted(path.name for path in config.runs_dir.iterdir()) == [
+        "20261102-000000-bbbb",
+        "20261104-000000-dddd",
+        "20261105-000000-eeee",
+    ]
+
+
+def test_prune_for_space_leaves_everything_when_the_disk_has_room(
+    config: LabConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Nothing is deleted while the disk has the room asked for."""
+    _old_run(config, "20261101-000000-aaaa")
+    _disk(monkeypatch, config, size_gb=12)
+
+    assert runs.prune_for_space(config, 10 * GB) == []
+    assert (config.runs_dir / "20261101-000000-aaaa").exists()
+
+
+def test_prune_for_space_never_deletes_a_fresh_run(
+    config: LabConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A run that changed within the last hour stays, however full the disk is."""
+    (config.runs_dir / "20261105-000000-eeee").mkdir(parents=True)
+    _disk(monkeypatch, config, size_gb=1)
+
+    assert runs.prune_for_space(config, 10 * GB) == []
+    assert (config.runs_dir / "20261105-000000-eeee").exists()
