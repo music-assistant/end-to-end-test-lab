@@ -39,7 +39,10 @@ player has no volume control, so bootstrap skips it.
 Image `mikebrady/shairport-sync:latest` (5.6.2, AirPlay 2 build, `[images] shairport` in
 `lab.toml`), command `-a lab-airplay-1`, with `images/shairport/shairport-sync.conf` mounted at
 `/etc/shairport-sync.conf`: `output_backend = "pipe"`, pipe `name = "/fifo/pcm"`,
-`output_rate = 48000`, `output_format = "S16_LE"`, `output_channels = 2`. The image entrypoint
+`output_rate = 48000`, `output_format = "S16_LE"`, `output_channels = 2`, and
+`audio_backend_buffer_desired_length_in_seconds = 0.15` in `general`: the pipe cannot take back
+what it has written, so with shairport's default of one second a flushed track stays in the
+capture for that second. The image entrypoint
 starts dbus, avahi and nqptp; each container has its own IP on the run bridge, so no host
 networking. Pacer without rate limit (shairport output is real time).
 
