@@ -213,40 +213,47 @@ def test_pacer_late_for_a_while_is_not_a_gap(tmp_path: Path) -> None:
 async def test_sendspin_capture_stamps_play_at_time(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A 250 ms late wake-up leaves the audio in place; chunks sent after play-at show late."""
-    sendspin_client = pytest.importorskip("labctl.sendspin_client")
-    clock = _VirtualClock(late_ns={10: 250_000_000})
-    monkeypatch.setattr(asyncio, "sleep", clock.sleep)
-    client = _FakeSendspinClient(clock)
-    writer = CaptureWriter(
-        "p",
+    """A 250 ms late wake-up and chunks sent after play-at leave the audio in place."""
+    # 50 ms chunks sent 200 ms ahead, until the server falls 30 ms behind from 3.5 s on
+    late = await _capture_sendspin(
         tmp_path,
-        48000,
-        2,
-        container_started_wall_ns=BASE_NS,
-        monotonic_ns=lambda: clock.now,
-        wall_ns=lambda: BASE_NS + clock.now,
+        monkeypatch,
+        50_000_000,
+        lambda i, play_ns: play_ns + (30_000_000 if i >= 60 else -200_000_000),
+        late_wake_ns={10: 250_000_000},
     )
-    capture_task = asyncio.create_task(
-        sendspin_client.SendspinCapture(client, writer, wall_ns=lambda: BASE_NS + clock.now).run()
-    )
-    pcm = np.repeat(np.round(_idle_then_tone() * 32767).astype("<i2"), 2).tobytes()
-    chunk_bytes = 2400 * 4
-    for i, start in enumerate(range(0, len(pcm), chunk_bytes)):
-        play_ns = 500_000_000 + i * 50_000_000
-        # sent 200 ms ahead, until the server falls 30 ms behind from 3.5 s on
-        await clock.advance_to(play_ns + (30_000_000 if i >= 60 else -200_000_000))
-        client.deliver(play_ns // 1000, pcm[start : start + chunk_bytes])
-        await clock.settle()
-    await clock.advance_to(10**10)
-    capture_task.cancel()
-    with suppress(asyncio.CancelledError):
-        await capture_task
-    writer.close()
-
     capture = Capture.load(tmp_path, "p", MANIFEST)
-    expected = [capture.start + 1.5, capture.start + 1.53 + 4.0 - MANIFEST.chirp.duration_s]
+    expected = [capture.start + 1.5, capture.start + 1.5 + 4.0 - MANIFEST.chirp.duration_s]
     assert capture.markers() == pytest.approx(expected, abs=0.005)
+    assert late == [0] * 60 + [30_000_000] * (len(late) - 60)
+
+
+async def test_sendspin_capture_keeps_a_late_burst_in_place(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chunks that arrive at once, up to 142 ms after their play-at time, leave the audio in place.
+
+    The arrivals of run 20261118-141911-a467 under CPU steal: the first 25 ms chunk came 10 ms
+    late, and later six chunks came together, 142 to 17 ms after their play-at time.
+    """
+    burst = range(120, 126)
+
+    def sent_ns(i: int, play_ns: int) -> int:
+        if i == 0:
+            return play_ns + 10_400_000
+        if i in burst:
+            return play_ns + (burst[-1] - i) * 25_000_000 + 17_400_000
+        return play_ns - 200_000_000
+
+    late = await _capture_sendspin(tmp_path, monkeypatch, 25_000_000, sent_ns)
+    capture = Capture.load(tmp_path, "p", MANIFEST)
+    expected = [capture.start + 1.5, capture.start + 1.5 + 4.0 - MANIFEST.chirp.duration_s]
+    assert capture.markers() == pytest.approx(expected, abs=0.005)
+    expected_late = [0] * len(late)
+    expected_late[0] = 10_400_000
+    for i in burst:
+        expected_late[i] = (burst[-1] - i) * 25_000_000 + 17_400_000
+    assert late == expected_late
 
 
 def test_level_follows_volume(tmp_path: Path) -> None:
@@ -351,6 +358,51 @@ def _split_into_reads(directory: Path, role: str, delay_ns: Callable[[int], int]
             size = min(4096, nbytes - start)
             lines.append(f"{mono + shift} {wall + shift} {offset + start} {size}\n")
     stamps.write_text("".join(lines))
+
+
+async def _capture_sendspin(
+    directory: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    chunk_ns: int,
+    sent_ns: Callable[[int, int], int],
+    late_wake_ns: dict[int, int] | None = None,
+) -> list[int]:
+    """Capture `_idle_then_tone()` through the Sendspin client on a virtual clock.
+
+    Chunk i plays at 0.5 s + i * chunk_ns and arrives at sent_ns(i, play_ns), or right after the
+    chunk before it when that is later; the client oversleeps by `late_wake_ns[sleep call]`.
+    Return the lateness each stamp line records.
+    """
+    sendspin_client = pytest.importorskip("labctl.sendspin_client")
+    clock = _VirtualClock(late_ns=late_wake_ns or {})
+    monkeypatch.setattr(asyncio, "sleep", clock.sleep)
+    client = _FakeSendspinClient(clock)
+    writer = CaptureWriter(
+        "p",
+        directory,
+        48000,
+        2,
+        container_started_wall_ns=BASE_NS,
+        monotonic_ns=lambda: clock.now,
+        wall_ns=lambda: BASE_NS + clock.now,
+    )
+    capture_task = asyncio.create_task(
+        sendspin_client.SendspinCapture(client, writer, wall_ns=lambda: BASE_NS + clock.now).run()
+    )
+    pcm = np.repeat(np.round(_idle_then_tone() * 32767).astype("<i2"), 2).tobytes()
+    chunk_bytes = chunk_ns * 48000 // 10**9 * 4
+    for i, start in enumerate(range(0, len(pcm), chunk_bytes)):
+        play_ns = 500_000_000 + i * chunk_ns
+        await clock.advance_to(sent_ns(i, play_ns))
+        client.deliver(play_ns // 1000, pcm[start : start + chunk_bytes])
+        await clock.settle()
+    await clock.advance_to(10**10)
+    capture_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await capture_task
+    writer.close()
+    stamps = (directory / "p.stamps").read_text().splitlines()
+    return [int(line.split()[4]) for line in stamps]
 
 
 class _VirtualClock:

@@ -92,7 +92,7 @@ summary.json      run_id, ref, sha, purpose, base image digest the build used (f
 junit.xml         pytest results
 ma.log            server log, written at teardown
 players.log       player and pacer container logs with timestamps, written at teardown; a snapclient or squeezelite that died or hung is diagnosed here
-captures/         <role>.pcm, .stamps and .json per role: the audio received, per-write timestamps, format
+captures/         <role>.pcm, .stamps and .json per role: the audio received, per-write timestamps (a Sendspin role adds how many ns after its play-at time a chunk arrived), format
 compose.yml       the rendered compose project, named lab-<run id>
 run.json          ref, sha (so gc keeps the worktree), purpose, areas, deep and devices; written first, before any slow step. Kept runs add the hold id
 src/              copy of what the run mounts from the lab repo (labctl, scenarios, pyproject.toml, tone manifest, mpd and shairport configs)

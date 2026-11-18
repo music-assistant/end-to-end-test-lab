@@ -30,7 +30,9 @@ analyzer's peak for the tone segment. The mpd "after stop" is from 2026-10-29 wi
 ## sendspin
 
 `lab-sendspin --role sendspin-1 --dir /captures --server ma --identity <run id>-sendspin-1`
-(`labctl/sendspin_client.py`, writes its own capture at the play-at time, no pacer). Provider:
+(`labctl/sendspin_client.py`, writes its own capture at the play-at time, no pacer). A chunk that
+arrived late stays at its play-at time, because the client cannot tell its own stall from a server
+that sent late; a fifth field in `.stamps` records how many ns late it arrived. Provider:
 builtin `sendspin`, nothing to set up; the client is auto-trusted through unpaired access. The
 player has no volume control, so bootstrap skips it.
 
