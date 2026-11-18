@@ -9,7 +9,7 @@ from scenarios.checks.bridge import (
     bridge_output_listed,
     mixed_group_plays_in_sync,
     mixed_group_stops_and_ends,
-    squeezelite_group_stays_native,
+    squeezelite_group_plays_over_sendspin,
 )
 from scenarios.checks.context import CheckContext
 
@@ -42,6 +42,6 @@ async def test_mixed_group_stops_and_ends(role: str, ctx: CheckContext) -> None:
     await mixed_group_stops_and_ends(ctx, role)
 
 
-async def test_squeezelite_group_stays_native(role: str, ctx: CheckContext) -> None:
-    """A group of squeezelite players and a player on its own keep their own protocol."""
-    await squeezelite_group_stays_native(ctx, role)
+async def test_squeezelite_group_plays_over_sendspin(role: str, ctx: CheckContext) -> None:
+    """A group of squeezelite players plays over Sendspin, and a player on its own natively."""
+    await squeezelite_group_plays_over_sendspin(ctx, role)

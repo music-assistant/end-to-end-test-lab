@@ -80,7 +80,7 @@ STOP_SILENT_WITHIN_S = 1.0
 STOP_WATCH_S = 4.0
 # one analysis window (85 ms) and what a resampler holds back at the end of a stream
 MAX_END_CUT_S = 0.15
-NATIVE_PLAYED_S = 8.0
+PAIR_PLAYED_S = 8.0
 
 
 @check
@@ -211,24 +211,23 @@ async def mixed_group_stops_and_ends(ctx: CheckContext, role: str) -> None:
 
 
 @check
-async def squeezelite_group_stays_native(ctx: CheckContext, role: str) -> None:
-    """Check a group of squeezelite players and a player on its own keep their own protocol."""
+async def squeezelite_group_plays_over_sendspin(ctx: CheckContext, role: str) -> None:
+    """Check a group of squeezelite players plays over Sendspin and a player on its own natively."""
     other = partner(role)
     leader, member = ctx.player_id(role), ctx.player_id(other)
     first = TWO_TRACKS[0]
     try:
         await _group(ctx, leader, member, BRIDGE_ISSUES)
         started = await _play_group(ctx, leader, TWO_TRACKS, BRIDGE_ISSUES)
-        with ctx.step("pair_plays_native", BRIDGE_ISSUES):
+        with ctx.step("pair_over_sendspin", BRIDGE_ISSUES):
             for heard_on in (role, other):
-                await _heard(
-                    ctx, heard_on, (first,), started, NATIVE_PLAYED_S, SYNC_HEARD_TIMEOUT_S
-                )
-            output = _player(ctx, leader).active_output_protocol
-            assert output == NATIVE_OUTPUT, f"leader plays on {output}"
-            # a sync member rides the stream of its leader and has no output of its own
-            output = _player(ctx, member).active_output_protocol
-            assert output is None, f"member plays on {output}"
+                await _heard(ctx, heard_on, (first,), started, PAIR_PLAYED_S, SYNC_HEARD_TIMEOUT_S)
+            player = _player(ctx, leader)
+            output = player.active_output_protocol
+            assert output is not None and output == _sendspin_output(player), (
+                f"leader plays on {output}"
+            )
+            _assert_over_sendspin(ctx, member, leader)
         await stop(ctx, leader)
         await ctx.client.players.ungroup(member)
         await _until_ungrouped(ctx, leader, member)
