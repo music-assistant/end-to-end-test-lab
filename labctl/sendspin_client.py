@@ -62,13 +62,13 @@ class SendspinCapture:
                 continue
             # converted at write time so the latest clock sync estimate applies
             delay_us = self._client.compute_play_time(server_timestamp_us) - self._client.now_us()
-            # stamped at play-at, so a late wake-up here does not move the audio; a chunk that
-            # arrived after its play-at time is stamped at arrival and still shows late
-            stamp_ns = max(self._wall_ns() + delay_us * 1000, arrived_wall_ns)
+            # stamped at play-at, so neither a late wake-up here nor a late arrival moves the
+            # audio: an arrival time cannot tell a stall of this client from a server that sent late
+            stamp_ns = self._wall_ns() + delay_us * 1000
             if delay_us > 0:
                 await asyncio.sleep(delay_us / 1e6)
             if generation == self._generation:
-                self._writer.write(payload, stamp_ns)
+                self._writer.write(payload, stamp_ns, max(arrived_wall_ns - stamp_ns, 0))
 
     def _on_audio_chunk(
         self, server_timestamp_us: int, payload: bytes, audio_format: AudioFormat, send_ahead: int
