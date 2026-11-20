@@ -23,6 +23,22 @@ JUNIT = """<?xml version="1.0" encoding="utf-8"?>
 </testsuite></testsuites>
 """
 
+AIRPLAY = "/src/scenarios/gate/test_player_kind.py::test_player_airplay[airplay-1]"
+DLNA = "/src/scenarios/gate/test_player_kind.py::test_player_dlna[dlna-1]"
+# one test that hit a known red, one whose listed step passed
+KNOWN_JUNIT = """<?xml version="1.0" encoding="utf-8"?>
+<testsuites><testsuite name="pytest" tests="2">
+<testcase classname="scenarios.gate.test_player_kind" name="test_player_airplay[airplay-1]">
+<properties><property name="area" value="players"/>
+<property name="known_red" value="next.heard"/><property name="known_red_note" value="libraop#60"/>
+<property name="known_red_error" value="heard at 3.4 s"/></properties>
+<skipped type="pytest.xfail" message="known red next.heard: libraop#60"/></testcase>
+<testcase classname="scenarios.gate.test_player_kind" name="test_player_dlna[dlna-1]">
+<properties><property name="area" value="players"/>
+<property name="known_red_passed" value="next.heard"/></properties></testcase>
+</testsuite></testsuites>
+"""
+
 
 def summary(exit_code: int | None, **extra: Any) -> dict[str, Any]:
     """Return a summary.json dict of run r1."""
@@ -46,6 +62,33 @@ def junit(tmp_path: Path) -> Path:
 def test_green(tmp_path: Path) -> None:
     """A passing run is one line."""
     assert format_run(summary(0), junit(tmp_path)) == "run r1: green (4 tests, 61 s)"
+
+
+def test_green_with_known_red(tmp_path: Path) -> None:
+    """A green run counts its known reds and lists them, and asks to remove a step that passed."""
+    path = tmp_path / "junit.xml"
+    path.write_text(KNOWN_JUNIT)
+    assert format_run(summary(0), path).splitlines() == [
+        "run r1: green (2 tests, 61 s), 1 known red",
+        f"  KNOWN {AIRPLAY}  checkpoint next.heard  heard at 3.4 s  (libraop#60)",
+        f"  KNOWN RED PASSED {DLNA}  checkpoint next.heard: "
+        "remove it from scenarios/known_red.toml",
+    ]
+
+
+def test_red_area_counts_known_red(tmp_path: Path) -> None:
+    """A red run counts known reds in the area line and lists them under it."""
+    path = tmp_path / "junit.xml"
+    path.write_text(
+        KNOWN_JUNIT.replace("</properties></testcase>", "</properties><failure/></testcase>")
+    )
+    assert format_run(summary(1), path).splitlines()[1:] == [
+        "area players: 0/2 passed, 1 known red",
+        f"  KNOWN {AIRPLAY}  checkpoint next.heard  heard at 3.4 s  (libraop#60)",
+        f"  FAIL {DLNA}  checkpoint -  issues -",
+        f"  KNOWN RED PASSED {DLNA}  checkpoint next.heard: "
+        "remove it from scenarios/known_red.toml",
+    ]
 
 
 def test_failed_before_pytest(tmp_path: Path) -> None:

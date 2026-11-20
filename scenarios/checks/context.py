@@ -5,13 +5,14 @@ from __future__ import annotations
 import contextlib
 import dataclasses
 import functools
-from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
+from collections.abc import AsyncIterator, Callable, Coroutine, Iterator, Mapping
 from typing import TYPE_CHECKING, Any, Concatenate, Protocol
 
 if TYPE_CHECKING:
     from music_assistant_client import MusicAssistantClient
 
     from labctl.analyze import Capture, Manifest
+    from scenarios.checks.known_red import KnownRed
     from scenarios.conftest import EventRecorder
 
 
@@ -37,6 +38,8 @@ class CheckContext:
     check: str = ""
     # roles a test addressed, recorded once each as a `role` property
     used: set[str] = dataclasses.field(default_factory=set)
+    # known reds that apply to this test, by qualified checkpoint
+    known_red: Mapping[str, KnownRed] = dataclasses.field(default_factory=dict)
 
     @contextlib.asynccontextmanager
     async def reconnect(self, timeout: float) -> AsyncIterator[MusicAssistantClient]:
@@ -61,27 +64,38 @@ class CheckContext:
         self, name: str, issues: tuple[str, ...] = ()
     ) -> contextlib.AbstractContextManager[None]:
         """Report a checkpoint `<check>.<name>` and the issues it guards, see `step`."""
-        return step(self.record_property, f"{self.check}.{name}" if self.check else name, issues)
+        if not self.check:
+            return step(self.record_property, name, issues)
+        qualified = f"{self.check}.{name}"
+        return step(self.record_property, qualified, issues, self.known_red.get(qualified))
 
 
 type Check[**P] = Callable[Concatenate[CheckContext, P], Coroutine[Any, Any, None]]
 
 
+class KnownRedError(Exception):
+    """A known red step failed; it ends its check, not the test."""
+
+
 def check[**P](fn: Check[P]) -> Check[P]:
-    """Mark a check function, so the checkpoints of its steps carry its name."""
+    """Mark a check, so its steps carry its name; a failed known red step ends only the check."""
 
     @functools.wraps(fn)
     async def bound(ctx: CheckContext, /, *args: P.args, **kwargs: P.kwargs) -> None:
-        await fn(dataclasses.replace(ctx, check=fn.__name__), *args, **kwargs)
+        with contextlib.suppress(KnownRedError):
+            await fn(dataclasses.replace(ctx, check=fn.__name__), *args, **kwargs)
 
     return bound
 
 
 @contextlib.contextmanager
 def step(
-    record_property: Callable[[str, object], None], name: str, issues: tuple[str, ...] = ()
+    record_property: Callable[[str, object], None],
+    name: str,
+    issues: tuple[str, ...] = (),
+    known: KnownRed | None = None,
 ) -> Iterator[None]:
-    """Report a checkpoint and the issues it guards, and name it on the error when it fails."""
+    """Report a checkpoint and its issues, naming it on a failure; `known` marks a known red."""
     joined = " ".join(issues)
     record_property("checkpoint", name)
     if issues:
@@ -90,7 +104,15 @@ def step(
         yield
     # pytest.fail raises an OutcomeException, which is not an Exception
     except BaseException as exc:
+        # only a failed assertion is the known red; an errored command or a time budget is not
+        if known is not None and isinstance(exc, AssertionError):
+            record_property("known_red", name)
+            record_property("known_red_note", known.note)
+            record_property("known_red_error", next(iter(str(exc).splitlines()), repr(exc)))
+            raise KnownRedError(name) from exc
         record_property("failed_checkpoint", name)
         record_property("failed_issues", joined)
         exc.add_note(f"checkpoint {name}" + (f" ({joined})" if issues else ""))
         raise
+    if known is not None:
+        record_property("known_red_passed", name)

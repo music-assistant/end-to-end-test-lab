@@ -24,7 +24,9 @@ def format_run(summary: dict[str, Any], junit: Path) -> str:
     # pytest writes no JUnit file when it exits on a usage error
     cases = runs.testcases(junit) if junit.exists() else {}
     if summary["exit_code"] == 0:
-        return f"{head}: green ({len(cases)} tests, {duration})"
+        line = f"{head}: green ({len(cases)} tests, {duration})"
+        known = sum(runs.outcome(case) == "known" for case in cases.values())
+        return "\n".join([f"{line}, {known} known red" if known else line, *known_red_lines(cases)])
     lines = [f"{head}: {at}, exit {summary['exit_code']}, {duration}"]
     for area, area_cases in _by_area(cases).items():
         lines += _area_lines(area, area_cases)
@@ -34,6 +36,11 @@ def format_run(summary: dict[str, Any], junit: Path) -> str:
         lines.append(f"rerun {summary['rerun_run_id']}: {passed} of {len(reruns)} passed on rerun")
         lines += [f"  {r['test']}: first {r['first']}, second {r['second']}" for r in reruns]
     return "\n".join(lines)
+
+
+def known_red_lines(cases: dict[str, ET.Element]) -> list[str]:
+    """Return a KNOWN line per known red a test hit and a notice per listed step that passed."""
+    return [line for node_id, case in cases.items() for line in _known_lines(node_id, case)]
 
 
 def format_runs(
@@ -67,17 +74,36 @@ def _run_line(run_id: str, meta: dict[str, Any], summary: dict[str, Any] | None)
 
 
 def _area_lines(area: str, cases: dict[str, ET.Element]) -> list[str]:
-    """Pass count of one area and a FAIL line per failed test."""
+    """Pass count of one area, a FAIL line per failed test and its known red lines."""
     outcomes = [runs.outcome(case) for case in cases.values()]
-    skipped = outcomes.count("skip")
+    skipped, known = outcomes.count("skip"), outcomes.count("known")
     line = f"area {area}: {outcomes.count('pass')}/{len(outcomes) - skipped} passed"
+    line += f", {known} known red" if known else ""
     lines = [f"{line}, {skipped} skipped" if skipped else line]
     for node_id, case in cases.items():
         if runs.outcome(case) == "fail":
             props = runs.properties(case)
             issues = props.get("failed_issues", props.get("issues", "-"))
             lines.append(f"  FAIL {node_id}  checkpoint {runs.checkpoint(case)}  issues {issues}")
+        lines += _known_lines(node_id, case)
     return lines
+
+
+def _known_lines(node_id: str, case: ET.Element) -> list[str]:
+    """KNOWN lines of the known reds one test hit, then its known red steps that passed."""
+    hits = zip(
+        runs.property_values(case, "known_red"),
+        runs.property_values(case, "known_red_error"),
+        runs.property_values(case, "known_red_note"),
+        strict=True,
+    )
+    lines = [
+        f"  KNOWN {node_id}  checkpoint {step}  {error}  ({note})" for step, error, note in hits
+    ]
+    return lines + [
+        f"  KNOWN RED PASSED {node_id}  checkpoint {step}: remove it from scenarios/known_red.toml"
+        for step in runs.property_values(case, "known_red_passed")
+    ]
 
 
 def _by_area(cases: dict[str, ET.Element]) -> dict[str, dict[str, ET.Element]]:

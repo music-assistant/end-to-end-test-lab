@@ -11,7 +11,7 @@ SEEK = "/src/scenarios/gate/test_seek.py::test_seek"
 
 
 def test_record_then_report(tmp_path: Path) -> None:
-    """Each rerun is one line; the report counts per check, most rerun first."""
+    """Each rerun is one line; the report counts per check, flaky and steady red apart."""
     path = tmp_path / "flakes.jsonl"
     flakes.record(
         path,
@@ -47,8 +47,11 @@ def test_record_then_report(tmp_path: Path) -> None:
         "second_checkpoint": "resume",
     }
     assert flakes.report(path).splitlines() == [
-        "gate/test_queue.py::test_queue  reruns 2  passed on rerun 1  roles dlna-1,slim-1",
-        "gate/test_seek.py::test_seek  reruns 1  passed on rerun 0  roles slim-1",
+        "flaky (failed, then passed on rerun)",
+        "gate/test_queue.py::test_queue  1 of 2 reruns  roles slim-1",
+        "steady red (failed twice)",
+        "gate/test_queue.py::test_queue  1 of 2 reruns  roles dlna-1",
+        "gate/test_seek.py::test_seek  1 of 1 reruns  roles slim-1",
     ]
 
 
@@ -73,7 +76,10 @@ def test_report_range(tmp_path: Path) -> None:
     ]
     path.write_text("".join(json.dumps(line) + "\n" for line in lines))
     now = datetime(2026, 10, 27, tzinfo=UTC)
-    assert flakes.report(path, 14, now) == "s  reruns 1  passed on rerun 0  roles -"
+    assert flakes.report(path, 14, now).splitlines() == [
+        "steady red (failed twice)",
+        "s  1 of 1 reruns  roles -",
+    ]
     assert flakes.report(path, 3, now) == "no reruns in the last 3 days"
 
 

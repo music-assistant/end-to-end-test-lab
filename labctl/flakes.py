@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -42,24 +42,17 @@ def record(
 
 
 def report(path: Path, days: int = 30, now: datetime | None = None) -> str:
-    """Return reruns per check over the last `days` days, most rerun first."""
+    """Return reruns per check over the last `days` days, flaky and steady red apart."""
     cutoff = (now or datetime.now(UTC)) - timedelta(days=days)
-    reruns: dict[str, int] = defaultdict(int)
-    passed: dict[str, int] = defaultdict(int)
-    roles: dict[str, set[str]] = defaultdict(set)
-    for entry in _entries(path):
-        if datetime.fromisoformat(entry["date"]) < cutoff:
-            continue
-        check = entry["check"]
-        reruns[check] += 1
-        passed[check] += entry["second"] == "pass"
-        roles[check].add(entry["role"])
-    if not reruns:
+    entries = [e for e in _entries(path) if datetime.fromisoformat(e["date"]) >= cutoff]
+    if not entries:
         return f"no reruns in the last {days} days"
-    checks = sorted(reruns, key=lambda c: (-reruns[c], c))
+    reruns = Counter(e["check"] for e in entries)
+    flaky = [e for e in entries if e["second"] == "pass"]
+    steady = [e for e in entries if e["second"] != "pass"]
     return "\n".join(
-        f"{c}  reruns {reruns[c]}  passed on rerun {passed[c]}  roles {','.join(sorted(roles[c]))}"
-        for c in checks
+        _section("flaky (failed, then passed on rerun)", flaky, reruns)
+        + _section("steady red (failed twice)", steady, reruns)
     )
 
 
@@ -76,6 +69,21 @@ def listing(path: Path, days: int = 30, now: datetime | None = None) -> str:
         f"{e['second']} ({e.get('second_checkpoint', '-')})"
         for e in sorted(entries, key=lambda e: e["date"], reverse=True)
     )
+
+
+def _section(title: str, entries: list[dict[str, str]], reruns: Counter[str]) -> list[str]:
+    """Title and one line per check of a report section, most entries first; none when empty."""
+    if not entries:
+        return []
+    counts = Counter(e["check"] for e in entries)
+    roles: dict[str, set[str]] = defaultdict(set)
+    for entry in entries:
+        roles[entry["check"]].add(entry["role"])
+    checks = sorted(counts, key=lambda c: (-counts[c], c))
+    return [title] + [
+        f"{c}  {counts[c]} of {reruns[c]} reruns  roles {','.join(sorted(roles[c]))}"
+        for c in checks
+    ]
 
 
 def _split(test: str) -> tuple[str, str]:

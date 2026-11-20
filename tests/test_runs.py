@@ -3,6 +3,7 @@
 import dataclasses
 import os
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -279,6 +280,13 @@ def test_failed_node_ids(tmp_path: Path) -> None:
         "/src/scenarios/gate/test_queue.py::test_queue[slim-1]",
         "/src/scenarios/gate/test_queue.py::test_queue[dlna-1]",
     )
+
+
+def test_known_red_outcome() -> None:
+    """An xfail skip is a known red, apart from a plain skip; neither counts as failed."""
+    known = ET.fromstring('<testcase><skipped type="pytest.xfail" message="known red"/></testcase>')
+    skipped = ET.fromstring('<testcase><skipped type="pytest.skip" message="no role"/></testcase>')
+    assert (runs.outcome(known), runs.outcome(skipped)) == ("known", "skip")
 
 
 def test_failed_checkpoints(tmp_path: Path) -> None:
