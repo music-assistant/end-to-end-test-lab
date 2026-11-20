@@ -58,7 +58,10 @@ lab run --ref pr/<n> --providers devices   # bench play and stop, journeys and s
 ```
 
 A gate (`--areas`, `--all`, or player providers alone) that fails is rerun once in a fresh
-project. It is red only when a test fails twice, and exits 0 when green.
+project. It is red only when a test fails twice, and exits 0 when green. A step listed in
+`scenarios/known_red.toml` that fails its assertion is reported as a known red: it runs once, is
+not rerun and does not make the gate red, and the test goes on with its remaining checks. A listed
+step that passes prints a notice to remove it.
 
 Examples:
 

@@ -17,7 +17,9 @@ from music_assistant_client import MusicAssistantClient
 from labctl.analyze import Capture, Manifest
 from labctl.areas import account_set_area
 from labctl.devices import Device, from_env, matches
+from scenarios.checks import known_red
 from scenarios.checks.context import CaptureLoader, CheckContext
+from scenarios.checks.known_red import KnownRed
 
 if TYPE_CHECKING:
     from music_assistant_models.enums import EventType
@@ -109,8 +111,13 @@ class EventRecorder:
 def pytest_runtest_makereport(
     item: pytest.Item,
 ) -> Generator[None, pytest.TestReport, pytest.TestReport]:
-    """Append the test's last server events to the failure of its call phase."""
+    """Report a passed test that hit a known red as xfail; append the last events to a failure."""
     report = yield
+    if report.when == "call" and report.passed:
+        if reason := known_red.xfail_reason(item.user_properties):
+            report.outcome = "skipped"
+            report.wasxfail = reason
+        return report
     longrepr = report.longrepr
     events = item.funcargs.get("events") if isinstance(item, pytest.Function) else None
     # a section of the exception repr lands in the junit failure text, not only the terminal
@@ -156,6 +163,12 @@ def run() -> LabRun:
 def tones(run: LabRun) -> Manifest:
     """Load the tone library manifest."""
     return Manifest.load(run.tones_manifest)
+
+
+@pytest.fixture(scope="session")
+def known_reds() -> list[KnownRed]:
+    """Load the known red list."""
+    return known_red.load(known_red.FILE)
 
 
 @pytest.fixture
@@ -227,12 +240,14 @@ async def ctx(
     capture: CaptureLoader,
     events: EventRecorder,
     record_property: Callable[[str, object], None],
+    known_reds: list[KnownRed],
     request: pytest.FixtureRequest,
 ) -> AsyncIterator[CheckContext]:
     """Bundle this test's fixtures for the shared checks; stop the test's player at teardown."""
-    yield CheckContext(client, players, tones, capture, events, record_property)
-    # a test killed by its time budget runs its own `finally` only after this client has closed
     subject = _subject(request)
+    applying = known_red.applying(known_reds, subject, os.environ.get("LAB_ACCOUNT_SET"))
+    yield CheckContext(client, players, tones, capture, events, record_property, known_red=applying)
+    # a test killed by its time budget runs its own `finally` only after this client has closed
     if subject in players:
         with contextlib.suppress(Exception):
             await client.player_queues.stop(players[subject])

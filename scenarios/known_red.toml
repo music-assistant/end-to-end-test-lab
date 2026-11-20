@@ -1,0 +1,15 @@
+# Known reds: checkpoints that fail for a known reason. A listed step that
+# fails is reported as a known red, is not rerun and does not make the gate red. Remove an entry
+# once its step passes again; the gate and `lab summary` print a notice when it does.
+#
+# step         qualified checkpoint `<check>.<step>`
+# role         optional, the role or device id the test runs on
+# account_set  optional, the account set of a music run (LAB_ACCOUNT_SET)
+# since        date the entry was added
+# note         reason and link
+
+[[known_red]]
+step = "next_drops_previous.next_heard"
+role = "airplay-1"
+since = "2026-10-30"
+note = "libraop warm skip: FLUSH then a back-dated START cuts the first 1.8 s of the new track, philippe44/libraop#60"

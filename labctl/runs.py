@@ -518,10 +518,14 @@ def testcases(junit: Path) -> dict[str, ET.Element]:
 
 
 def outcome(testcase: ET.Element) -> str:
-    """Return `fail` (failure or error), `skip` or `pass` for a JUnit testcase."""
+    """Return `fail` (failure or error), `known` (known red), `skip` or `pass` for a testcase."""
     if testcase.find("failure") is not None or testcase.find("error") is not None:
         return "fail"
-    return "skip" if testcase.find("skipped") is not None else "pass"
+    skipped = testcase.find("skipped")
+    if skipped is None:
+        return "pass"
+    # scenarios/conftest.py reports a test that hit a known red as xfail
+    return "known" if skipped.get("type") == "pytest.xfail" else "skip"
 
 
 def failed_node_ids(junit: Path) -> tuple[str, ...]:
@@ -532,6 +536,11 @@ def failed_node_ids(junit: Path) -> tuple[str, ...]:
 def properties(testcase: ET.Element) -> dict[str, str]:
     """Return a JUnit testcase's properties by name; a repeated name keeps its last value."""
     return {prop.get("name", ""): prop.get("value", "") for prop in testcase.iter("property")}
+
+
+def property_values(testcase: ET.Element, name: str) -> list[str]:
+    """Return every value of a JUnit testcase's property `name`, in recorded order."""
+    return [prop.get("value", "") for prop in testcase.iter("property") if prop.get("name") == name]
 
 
 def checkpoint(testcase: ET.Element) -> str:

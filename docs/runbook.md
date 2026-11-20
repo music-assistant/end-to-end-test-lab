@@ -71,7 +71,7 @@ Ctrl-C tears the run down (unless `--keep`) and then releases the lease.
 
 Gate rerun. When a gate run exits 1 and wrote `junit.xml` (test failures, not 2 to 5, a failure before pytest or a pytest that died), `lab run` reruns the failed and errored tests once, by node id with the same marker, as a new run in a fresh compose project under the same lease and checkout. The command's exit code is the rerun's, so the gate is red only when a test fails twice. The first run's `summary.json` gets `rerun_run_id` and `reruns` (`[{"test": <node id>, "first": "fail", "second": "pass"|"fail"}]`); the rerun's `junit.xml`, captures and `ma.log` live in its own run dir. `--keep` skips the rerun and keeps the failed run up. Smoke, music, bench and `--deep` runs never rerun.
 
-Flake ledger. Every gate rerun appends one line per rerun test to `/srv/lab/flakes.jsonl` (date, run id, ref, node id, role, check, first and second outcome, and `first_checkpoint` and `second_checkpoint`: the failed or else last checkpoint of each run, `-` when that run passed or recorded none). `lab flakes [--days n]` (default 30) prints one line per check, most rerun first: `<check>  reruns <n>  passed on rerun <k>  roles <roles>`. `lab flakes --list` prints the entries themselves, newest first: `<date>  <run id>  <ref>  <node id>  fail (<checkpoint>) -> pass (-)`. Lines written before the checkpoints were recorded show `-`.
+Flake ledger. Every gate rerun appends one line per rerun test to `/srv/lab/flakes.jsonl` (date, run id, ref, node id, role, check, first and second outcome, and `first_checkpoint` and `second_checkpoint`: the failed or else last checkpoint of each run, `-` when that run passed or recorded none). `lab flakes [--days n]` (default 30) prints the reruns per check in two sections, `flaky (failed, then passed on rerun)` and `steady red (failed twice)`, each most rerun first: `<check>  <k> of <n> reruns  roles <roles>`, where `n` counts all reruns of the check and the roles are those of the section. A check can show up in both. `lab flakes --list` prints the entries themselves, newest first: `<date>  <run id>  <ref>  <node id>  fail (<checkpoint>) -> pass (-)`. Lines written before the checkpoints were recorded show `-`.
 
 ```
 lab runs [--ref <ref>] [--days <n>]
@@ -83,7 +83,7 @@ prints one line per run of the last `n` days (default 7), newest first, optional
 lab summary <run id> [<run id> ...]
 ```
 
-prints per run either `run <id>: green (<n> tests, <s> s)`, or a header with ref, sha, exit code and duration, one `area <name>: <passed>/<total> passed` line per area (the `area` testcase property, `-` without one; skips counted apart) with a `FAIL` line per failed test (node id, the failed checkpoint or else the last one, issues), and the rerun outcome. A run without an exit code failed before pytest.
+prints per run either `run <id>: green (<n> tests, <s> s)`, or a header with ref, sha, exit code and duration, one `area <name>: <passed>/<total> passed` line per area (the `area` testcase property, `-` without one; skips left out of the total, known reds named apart) with a `FAIL` line per failed test (node id, the failed checkpoint or else the last one, issues), and the rerun outcome. Known red lines follow either form, see [Known reds](#known-reds). A run without an exit code failed before pytest.
 
 A run leaves `/srv/lab/runs/<run id>/` (the id is a UTC timestamp plus a suffix):
 
@@ -313,6 +313,27 @@ A check is one behaviour of the server, checked on one role or device, in a modu
 - New roles for an area go in `AREA_ROLES` in `labctl/areas.py`, not in a test's marker.
 
 Two unit tests enforce this: `tests/test_scenario_coverage.py` fails on a check without `@check` or without a deep, bench, music or smoke test that calls it, and `tests/test_gate_roles.py` fails when a gate module asks for roles outside `gate_roles` of its area.
+
+## Known reds
+
+A known red is a step that fails every time for a known reason that waits on a fix elsewhere, such as a bug in a player library. Listed in `scenarios/known_red.toml`, it no longer fails the gate, is not rerun, stays out of the flake ledger, and the test goes on with its next check.
+
+Add an entry only for a step that fails steadily and whose cause is known and tracked elsewhere:
+
+```
+[[known_red]]
+step = "next_drops_previous.next_heard"   # <check>.<step>
+role = "airplay-1"                        # optional: role or device id the test runs on
+account_set = "spotify-a"                 # optional: account set of a music run
+since = "2026-10-30"
+note = "libraop warm skip ..., philippe44/libraop#60"
+```
+
+An entry applies when its step matches and every filter it gives matches. When the step fails an assertion, the step records `known_red`, `known_red_note` and `known_red_error` (the first line of the assertion) and its check ends: the steps after it in that check do not run, the check's own cleanup does. Any other error in the step, a timeout or `pytest.fail` (such as a tone that is never heard) stays a real failure. A test that hit a known red and otherwise passed is reported as xfail (`<skipped type="pytest.xfail">` in `junit.xml`). A test that also fails elsewhere is a normal failure and is rerun.
+
+`lab run` and `lab summary` print one line per known red, `KNOWN <node id>  checkpoint <step>  <error>  (<note>)`, and count them in the area line or after `green (...)`. When a listed step passes, the step records `known_red_passed` and both print `KNOWN RED PASSED <node id>  checkpoint <step>: remove it from scenarios/known_red.toml`. Remove the entry then, so the step guards again.
+
+In `lab flakes`, `steady red` lists the checks that failed twice: a server regression, or a candidate for an entry once its cause is known and tracked. `flaky` lists the checks that passed on their rerun.
 
 ## Hardware
 

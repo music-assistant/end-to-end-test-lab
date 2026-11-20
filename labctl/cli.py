@@ -20,7 +20,7 @@ from labctl.broker_client import BrokerClient, BrokerError, HeldLease
 from labctl.config import REPO_ROOT, LabConfig, config_path, load_config
 from labctl.leases import account_resource, device_resource
 from labctl.plan import RunSpec, plan
-from labctl.summary import format_run, format_runs
+from labctl.summary import format_run, format_runs, known_red_lines
 
 # pytest's exit code when it collected nothing
 NO_TESTS_COLLECTED = 5
@@ -102,7 +102,7 @@ def run_summary(config: LabConfig, run_ids: tuple[str, ...]) -> None:
 @click.option("--list", "as_list", is_flag=True, help="Print every rerun with its checkpoints.")
 @click.pass_obj
 def flakes_report(config: LabConfig, days: int, as_list: bool) -> None:
-    """Print gate reruns per check and how many passed on the second run."""
+    """Print gate reruns per check, flaky (passed on rerun) and steady red (failed twice) apart."""
     if as_list:
         click.echo(flakes.listing(config.flakes_file, days))
     else:
@@ -452,6 +452,9 @@ def _test(
             f"run {run.id}: exit {exit_code}, junit {summary['junit']}, "
             f"{summary['duration_s']:.0f} s, output in {run.dir}"
         )
+        junit = run.dir / "junit.xml"
+        if junit.exists() and (lines := known_red_lines(runs.testcases(junit))):
+            click.echo("\n".join(lines))
     return exit_code
 
 
