@@ -38,19 +38,26 @@ SEARCH_RETRY_S = 5.0
 ENGINE_COMMAND_TIMEOUT_S = 5.0
 
 
-async def pick_tracks(client: MusicAssistantClient, count: int) -> list[Track]:
-    """Return `count` available tracks of 1 to 4 minutes, library first (by name), else search."""
+async def pick_tracks(
+    client: MusicAssistantClient,
+    count: int,
+    min_s: int = MIN_TRACK_S,
+    max_s: int = MAX_TRACK_S,
+    query: str = SEARCH_QUERY,
+) -> list[Track]:
+    """Return `count` available tracks of `min_s` to `max_s` s, library first, else search."""
     library = await client.music.get_library_tracks(limit=LIBRARY_LIMIT, sort_field=SortField.NAME)
-    picked = _fitting(library, count)
+    picked = _fitting(library, count, min_s, max_s)
     for attempt in range(SEARCH_ATTEMPTS):
         if len(picked) >= count:
             break
         if attempt:
             await asyncio.sleep(SEARCH_RETRY_S)
-        found = await client.music.search(SEARCH_QUERY, [MediaType.TRACK], limit=SEARCH_LIMIT)
-        picked = _fitting((track for track in found.tracks if track.provider != "library"), count)
+        found = await client.music.search(query, [MediaType.TRACK], limit=SEARCH_LIMIT)
+        searched = (track for track in found.tracks if track.provider != "library")
+        picked = _fitting(searched, count, min_s, max_s)
     if len(picked) < count:
-        bounds = f"{MIN_TRACK_S} and {MAX_TRACK_S} s"
+        bounds = f"{min_s} and {max_s} s"
         pytest.fail(f"found {len(picked)} of {count} tracks between {bounds}")
     return picked
 
@@ -134,13 +141,13 @@ async def soloist_command(instance_id: str, command: str) -> None:
     pytest.fail(f"Soloist engine closed the socket before acknowledging {command}")
 
 
-def _fitting(tracks: Iterable[Track], count: int) -> list[Track]:
+def _fitting(tracks: Iterable[Track], count: int, min_s: int, max_s: int) -> list[Track]:
     """First `count` distinct available tracks within the duration bounds."""
     picked: list[Track] = []
     for track in tracks:
         if (
             track.duration is not None
-            and MIN_TRACK_S <= track.duration <= MAX_TRACK_S
+            and min_s <= track.duration <= max_s
             and any(mapping.available for mapping in track.provider_mappings)
             and all(track.uri != other.uri for other in picked)
         ):

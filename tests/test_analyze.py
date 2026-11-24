@@ -59,6 +59,18 @@ def test_load_since_matches_full_load(tmp_path: Path) -> None:
     assert [s.kind for s in tail.timeline()] == ["a1t2", "silence"]
 
 
+def test_first_sound_skips_written_silence(tmp_path: Path) -> None:
+    """Silence an idle player writes is not sound; the first sound after `since` is."""
+    _write(tmp_path, "p", [(0.0, np.zeros(48000)), (1.0, _tone("a1t1", 2.0))], total_s=4.0)
+    full = Capture.load(tmp_path, "p", MANIFEST)
+    since = full.start + 0.5
+    capture = Capture.load(tmp_path, "p", MANIFEST, since=since)
+    first = capture.first_sound(since)
+    assert first is not None
+    assert first - full.start == pytest.approx(1.0, abs=0.01)
+    assert capture.first_sound(full.start + 3.5) is None
+
+
 def test_hear_load_rejects_tone_playing_before_command(tmp_path: Path) -> None:
     """A tone already playing at the command is rejected, one starting in its window is not."""
     _write(tmp_path, "p", [(0.5, _tone("a1t1", 3.0))], total_s=8.0)

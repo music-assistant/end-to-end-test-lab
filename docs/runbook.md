@@ -44,7 +44,7 @@ lab run --ref <ref> [--providers <list>] [--areas <areas> | --all | --deep] [-k 
   - a music provider by its domain: `spotify`, `apple_music`, `tidal`, `ytmusic`, `qobuz`, `deezer`. It resolves to the frozen account set of that provider (`spotify` is `spotify-a`) and fails when there is none or more than one; a set name such as `spotify-a` works as well.
   - a bench device id from `[devices]` (`sonos-1`), or `devices` for every registered one; see Hardware.
 - `--areas` is a comma-separated list of gate areas (`AREA_ROLES` in `labctl/areas.py`: `core`, `queue`, `streams`, `players`, `bridge`, `library`).
-- `-k` is a pytest `-k` expression. It narrows whichever mode the other flags picked; the smoke test only runs when nothing is listed. The smoke run has the smoke test, parametrized over every role; music runs have `continuity`, `external_pause`, `last_track_ends_clean` and `provider_reload`, see Account sets.
+- `-k` is a pytest `-k` expression. It narrows whichever mode the other flags picked; the smoke test only runs when nothing is listed. The smoke run has the smoke test, parametrized over every role; music runs have `continuity`, `external_pause`, `last_track_ends_clean`, `long_track_starts_fast` and `provider_reload`, see Account sets.
 - `--keep` leaves the run up instead of tearing it down and keeps its lease as a hold, see below.
 
 The flags pick what runs:
@@ -248,6 +248,11 @@ on the server's loopback and publishes its port in `/data/spotify/<instance>/sol
   end. The queue must go idle without a `paused` queue or player state, the capture must have no
   silence over 1 s until 3 s before the end and no sound from 5 s after it (a replay), and the
   server log no ERROR line since the play (#6860, #6667, #6222).
+- `long_track_starts_fast` (every set): one track of 10 to 30 minutes (library first, else a
+  `Shine On You Crazy Diamond` search), played from a stopped queue. The first non-zero sample must
+  reach the capture within 3 s of `play_media` (an idle player writes zeros); the test waits up to 20 s so a slow start still reports its
+  time. This is support#7205: ffmpeg read every fMP4 fragment of an Apple Music track before its
+  first output, about 7 s at 814 s.
 - `provider_reload` (every set, once): reloads every non-builtin music provider, which must be
   available again within 60 s and return `The Beatles` tracks from its own domain (#6119). A
   server restart would cut the tests container's network, which it shares with the server.
@@ -256,7 +261,7 @@ Music tests carry no area marker: their `area` property is `music_<provider>` of
 set (`ACCOUNT_SET_PROVIDERS` in `labctl/areas.py`), passed as `LAB_ACCOUNT_SET`.
 
 The tracks used (`tracks` or `track`), the boundary gap (`boundary_gap_s`), the stop latency
-(`stop_s`), the reloaded providers (`providers`) and their time to available (`available_s`) are
+(`stop_s`), the start latency (`start_s`), the reloaded providers (`providers`) and their time to available (`available_s`) are
 testcase properties in `junit.xml`, next to the checkpoints.
 
 ### Re-login

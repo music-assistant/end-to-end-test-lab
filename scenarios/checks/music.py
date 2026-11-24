@@ -1,4 +1,4 @@
-"""Music checks on a real streaming account: track boundaries, the last track, external pause."""
+"""Music checks on a real streaming account: track boundaries, last track, pause, long start."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from scenarios.helpers import (
     queue_playing,
     silences,
     soloist_command,
+    until,
 )
 
 if TYPE_CHECKING:
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
 CONTINUITY_ISSUES = ("#6860",)
 EXTERNAL_PAUSE_ISSUES = ("#6752", "#7117")
 LAST_TRACK_ISSUES = ("#6860", "#6667", "#6222")
+LONG_START_ISSUES = ("#7205",)
 
 # the seek leaves this much of the track, so the check sees its natural end quickly
 TAIL_S = 20
@@ -55,6 +57,13 @@ STOP_WITHIN_S = 3.0
 IDLE_TIMEOUT_S = 10.0
 # the resume position may trail the elapsed time at the pause by what the player had buffered
 RESUME_TOLERANCE_S = 3.0
+# long enough that a start cost growing with the track length shows (#7205: 7 s at 814 s)
+LONG_TRACK_MIN_S = 600
+LONG_TRACK_MAX_S = 1800
+LONG_TRACK_QUERY = "Shine On You Crazy Diamond"
+MAX_LONG_START_S = 3.0
+# waits past the budget so a slow start still reports how slow it was
+LONG_START_TIMEOUT_S = 20.0
 
 
 @check
@@ -228,6 +237,41 @@ async def last_track_ends_clean(ctx: CheckContext, role: str) -> None:
         with ctx.step("no_errors_logged", LAST_TRACK_ISSUES):
             errors = ma_log_errors(log_offset)
             assert not errors, f"server log errors: {errors}"
+    finally:
+        await ctx.client.player_queues.stop(player_id)
+
+
+@check
+async def long_track_starts_fast(ctx: CheckContext, role: str) -> None:
+    """Check a track of over 10 minutes is heard within 3 s of play from a stopped queue."""
+    player_id = ctx.player_id(role)
+    [track] = await pick_tracks(ctx.client, 1, LONG_TRACK_MIN_S, LONG_TRACK_MAX_S, LONG_TRACK_QUERY)
+    ctx.record_property("track", describe(track))
+    await ctx.client.player_queues.stop(player_id)
+
+    def queue_idle() -> bool:
+        queue = ctx.client.player_queues.get(player_id)
+        return queue is not None and queue.state == "idle"
+
+    await until(queue_idle, IDLE_TIMEOUT_S)
+    try:
+        started = time.time()
+        await ctx.client.player_queues.play_media(player_id, track, QueueOption.REPLACE)
+        with ctx.step("starts_fast", LONG_START_ISSUES):
+            first: float | None = None
+
+            def audio_written() -> bool:
+                nonlocal first
+                first = ctx.capture(role, started).first_sound(started)
+                return first is not None
+
+            await until(audio_written, LONG_START_TIMEOUT_S)
+            assert first is not None
+            latency = first - started
+            ctx.record_property("start_s", f"{latency:.2f}")
+            assert latency <= MAX_LONG_START_S, (
+                f"first audio {latency:.1f} s after play, budget {MAX_LONG_START_S} s"
+            )
     finally:
         await ctx.client.player_queues.stop(player_id)
 

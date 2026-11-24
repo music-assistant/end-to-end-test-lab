@@ -194,6 +194,13 @@ class Capture:
         """Wall-clock time of the end of the capture."""
         return self.start + len(self.samples) / self.rate
 
+    def first_sound(self, since: float) -> float | None:
+        """Wall-clock time of the first non-zero sample from `since` on, None before any."""
+        # an idle player writes exact zeros, a track is non-zero within its first milliseconds
+        first = max(round((since - self.start) * self.rate), 0)
+        nonzero = np.flatnonzero(self.samples[first:])
+        return None if nonzero.size == 0 else self.start + (first + int(nonzero[0])) / self.rate
+
     def timeline(self, window: int = WINDOW) -> list[Segment]:
         """Classify consecutive windows as a tone id, `silence`, `mixed` or `unknown`."""
         windows = self._windows(window)
